@@ -134,7 +134,7 @@ async function handleVerifySchedules(job) {
           { schedule },
           { delay: 40000 }
         );
-        logger.info(`Disparo agendado para: ${schedule.contact.name}`);
+        logger.info(`Scheduled message for: ${schedule.contact.name}`);
       });
     }
   } catch (e: any) {
@@ -166,14 +166,6 @@ async function handleSendScheduledMessage(job) {
 
     if (!whatsapp)
       whatsapp = await GetDefaultWhatsApp(whatsapp.id,schedule.companyId);
-
-
-    // const settings = await CompaniesSettings.findOne({
-    //   where: {
-    //     companyId: schedule.companyId
-    //   }
-    // })
-
     let filePath = null;
     if (schedule.mediaPath) {
       filePath = path.resolve("public", `company${schedule.companyId}`, schedule.mediaPath);
@@ -223,18 +215,7 @@ async function handleSendScheduledMessage(job) {
       } else {
         await verifyMessage(sentMessage, ticket, ticket.contact, null, true, false);
       }
-      // if (ticket) {
-      //   await UpdateTicketService({
-      //     ticketData: {
-      //       sendFarewellMessage: false,
-      //       status: schedule.statusTicket,
-      //       userId: schedule.ticketUserId || null,
-      //       queueId: schedule.queueId || null
-      //     },
-      //     ticketId: ticket.id,
-      //     companyId: ticket.companyId
-      //   })
-      // }
+
     } else {
       await SendMessage(whatsapp, {
         number: schedule.contact.number,
@@ -290,8 +271,7 @@ async function handleSendScheduledMessage(job) {
       const hora = dataExistente.getHours();
       const fusoHorario = dataExistente.getTimezoneOffset();
 
-      // Realizar a soma da data com base no intervalo e valor do intervalo
-      let novaData = new Date(dataExistente); // Clone da data existente para não modificar a original
+      let novaData = new Date(dataExistente); 
 
       console.log(unidadeIntervalo)
       if (unidadeIntervalo !== "minuts") {
@@ -1574,16 +1554,18 @@ async function handleCloseTicketsAutomatic() {
 }
 
 async function handleWhatsapp() {
+  const timeZone = process.env.TZ || 'America/Bogota';
   const jobW = new CronJob('* 15 3 * * *', async () => {
     //*Whatsapp
     GetWhatsapp();
     jobW.stop();
-  }, null, false, 'America/Sao_Paulo')
+  }, null, false, timeZone);
   jobW.start();
 }
 
 async function handleInvoiceCreate() {
-  logger.info("GERANDO RECEITA...");
+  // Logger english 
+  logger.info("Generating invoice...");
   const job = new CronJob('*/30 * * * * *', async () => {
     const companies = await Company.findAll();
     companies.map(async c => {
@@ -1683,7 +1665,7 @@ handleCloseTicketsAutomatic();
 handleRandomUser();
 
 export async function startQueueProcess() {
-  logger.info("Iniciando processamento de filas");
+  logger.info("Start Queue Process");
 
   messageQueue.process("SendMessage", handleSendMessage);
 

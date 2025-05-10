@@ -1,9 +1,13 @@
 import pino from 'pino';
 import moment from 'moment-timezone';
 
-// Função para obter o timestamp com fuso horário
+// Set the default timezone to 'America/Bogota' if not set in the environment
+// process.env.TZ = process.env.TZ || 'America/Bogota';
+// Set the default locale to 'es' (Spanish) if not set in the environment
+moment.locale(process.env.LANG || 'es');
 const timezoned = () => {
-  return moment().tz('America/Sao_Paulo').format('DD-MM-YYYY HH:mm:ss');
+  const timeZone = process.env.TZ || 'America/Bogota'; 
+  return moment().tz(timeZone).format('DD-MM-YYYY HH:mm:ss');
 };
 
 const logger = pino({
@@ -12,11 +16,11 @@ const logger = pino({
     options: {
       colorize: true,
       levelFirst: true,
-      translateTime: 'SYS:dd-mm-yyyy HH:MM:ss', // Use this para tradução de tempo
+      translateTime: 'SYS:dd-mm-yyyy HH:MM:ss', 
       ignore: "pid,hostname"
     },
   },
-  timestamp: () => `,"time":"${timezoned()}"`, // Adiciona o timestamp formatado
+  timestamp: () => `,"time":"${timezoned()}"`, 
 });
 
 export default logger;

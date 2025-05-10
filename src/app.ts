@@ -52,25 +52,6 @@ if (String(process.env.BULL_BOARD).toLocaleLowerCase() === 'true' && process.env
   app.use('/admin/queues', isBullAuth, BullBoard.UI);
 }
 
-// Middlewares
-// app.use(helmet({
-//   contentSecurityPolicy: {
-//     directives: {
-//       defaultSrc: ["'self'", "https://localhost:8080"],
-//       imgSrc: ["'self'", "data:", "https://localhost:8080"],
-//       scriptSrc: ["'self'", "https://localhost:8080"],
-//       styleSrc: ["'self'", "'unsafe-inline'", "https://localhost:8080"],
-//       connectSrc: ["'self'", "https://localhost:8080"]
-//     }
-//   },
-//   crossOriginResourcePolicy: false, // Permite recursos de diferentes origens
-//   crossOriginEmbedderPolicy: false, // Permite incorporação de diferentes origens
-//   crossOriginOpenerPolicy: false, // Permite abertura de diferentes origens
-//   // crossOriginResourcePolicy: {
-//   //   policy: "cross-origin" // Permite carregamento de recursos de diferentes origens
-//   // }
-// }));
-
 app.use(compression()); // Compressão HTTP
 app.use(bodyParser.json({ limit: '5mb' })); // Aumentar o limite de carga para 5 MB
 app.use(bodyParser.urlencoded({ limit: '5mb', extended: true }));
