@@ -19,7 +19,9 @@ import BullQueue from "./libs/queue"
 import BullBoard from 'bull-board';
 import basicAuth from 'basic-auth';
 
-// Função de middleware para autenticação básica
+import { setupSwagger } from './config/swagger';
+
+
 export const isBullAuth = (req, res, next) => {
   const user = basicAuth(req);
 
@@ -30,7 +32,7 @@ export const isBullAuth = (req, res, next) => {
   next();
 };
 
-// Carregar variáveis de ambiente
+
 dotenvConfig();
 
 // Inicializar Sentry
@@ -38,7 +40,7 @@ Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const app = express();
 
-// Configuração de filas
+
 app.set("queues", {
   messageQueue,
   sendScheduledMessages
@@ -46,14 +48,14 @@ app.set("queues", {
 
 const allowedOrigins = [process.env.FRONTEND_URL];
 
-// Configuração do BullBoard
+
 if (String(process.env.BULL_BOARD).toLocaleLowerCase() === 'true' && process.env.REDIS_URI_ACK !== '') {
   BullBoard.setQueues(BullQueue.queues.map(queue => queue && queue.bull));
   app.use('/admin/queues', isBullAuth, BullBoard.UI);
 }
 
-app.use(compression()); // Compressão HTTP
-app.use(bodyParser.json({ limit: '5mb' })); // Aumentar o limite de carga para 5 MB
+app.use(compression()); 
+app.use(bodyParser.json({ limit: '5mb' })); 
 app.use(bodyParser.urlencoded({ limit: '5mb', extended: true }));
 app.use(
   cors({
@@ -66,13 +68,15 @@ app.use(express.json());
 app.use(Sentry.Handlers.requestHandler());
 app.use("/public", express.static(uploadConfig.directory));
 
-// Rotas
+// Swagger docs
+setupSwagger(app);
+
+// Routes
 app.use(routes);
 
-// Manipulador de erros do Sentry
 app.use(Sentry.Handlers.errorHandler());
 
-// Middleware de tratamento de erros
+// Middleware errors 
 app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
   if (err instanceof AppError) {
     logger.warn(err);
