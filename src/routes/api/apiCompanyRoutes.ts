@@ -11,6 +11,7 @@ import isAuthCompany from "../../middleware/isAuthCompany";
 const apiCompanyRoutes = express.Router();
 
 // PLANS
+
 apiCompanyRoutes.get("/plans", isAuthCompany, PlanController.index);
 
 apiCompanyRoutes.get("/plans/:id", isAuthCompany, PlanController.show);

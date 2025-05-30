@@ -35,7 +35,7 @@ const swaggerOptions: Options = {
       // Puedes añadir más servidores aquí si es necesario
     ],
     // (Opcional) Si quieres proteger tus docs con JWT u otro esquema:
-    components: {
+   /*  components: {
       securitySchemes: {
         bearerAuth: {
           type: 'http',
@@ -48,7 +48,7 @@ const swaggerOptions: Options = {
       {
         bearerAuth: [],
       },
-    ],
+    ], */
   },
   // Rutas a los archivos que contienen las anotaciones JSDoc para tu API.
   // Ajusta estas rutas según la estructura de tu proyecto.

@@ -58,6 +58,120 @@ type UpdatePlanData = {
   useIntegrations?: boolean;
 };
 
+// Swagger documentation
+
+/**
+ * @swagger
+ * tags:
+ *   name: Plans
+ *   description: API for managing plans
+ */
+/**
+ * @swagger
+ * /plans:
+ *  get: 
+ *  summary: List all plans by search param and page number
+ *  tags: [Plans]
+ *  parameters:
+ *    - in: query
+ *      name: searchParam
+ *      description: Search parameter (name, description, etc.)
+ *      required: false
+ *      schema:
+ *        type: string
+ *    - in: query
+ *      name: pageNumber
+ *      description: Page number for pagination
+ *      required: false
+ *      schema:
+ *        type: integer
+ *  responses:
+ *    200:
+ *      description: OK
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            properties:
+ *             plans:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                   name:
+ *                     type: string     
+ *                   description:
+ *                     type: string
+ *                   useOpenAi:
+ *                     type: boolean
+ *                   useIntegrations:
+ *                     type: boolean
+ *                   useKanban:
+ *                     type: boolean
+ *                   users:
+ *                     type: integer
+ *                   connections:
+ *                     type: integer
+ *                   queues:
+ *                     type: integer
+ *                   amount:
+ *                     type: string
+ *                   useWhatsapp:
+ *                     type: boolean
+ *                   useFacebook:
+ *                     type: boolean
+ *                   useInstagram:
+ *                     type: boolean
+ *                   useCampaigns:
+ *                     type: boolean
+ *                   useSchedules:
+ *                     type: boolean
+ *                   useInternalChat:
+ *                     type: boolean
+ *                   useExternalApi:
+ *                     type: boolean
+ *                   trial:
+ *                     type: boolean
+ *                   trialDays:
+ *                     type: integer
+ *                   recurrence:
+ *                     type: string
+ *                   createdAt:
+ *                     type: string
+ *                     format: date-time
+ *                   updatedAt:
+ *                     type: string
+ *                     format: date-time  
+ *                   deletedAt:
+ *                     type: string
+ *                     format: date-time
+ *             count:
+ *               type: integer
+ *             hasMore:
+ *               type: boolean
+ *    400:
+ *      description: Bad Request
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            properties:
+ *              error:
+ *                type: string
+ *                description: Error message
+ *    500:
+ *      description: Internal Server Error
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            properties:
+ *              error:
+ *                type: string
+ *                description: Error message  
+ */
 export const index = async (req: Request, res: Response): Promise<Response> => {
   const { searchParam, pageNumber } = req.query as IndexQuery;
 
@@ -68,6 +182,51 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 
   return res.json({ plans, count, hasMore });
 };
+
+/**
+ * @swagger
+ * /plans:
+ *  post: 
+ *  summary: Create a new plan
+ *  tags: [Plans]
+ *  requestBody:
+ *    required: true
+ *    content:
+ *      application/json:
+ *        schema:
+ *          type: object
+ *          properties:
+ *            name:
+ *              type: string
+ *            users:
+ *              type: integer
+ *            connections:
+ *              type: integer
+ *            queues:
+ *              type: integer
+ *            amount:
+ *              type: string
+ *            useWhatsapp:
+ *              type: boolean
+ *            useFacebook:
+ *              type: boolean
+ *            useInstagram:
+ *              type: boolean
+ *            useCampaigns:
+ *              type: boolean
+ *            useSchedules:
+ *              type: boolean
+ *            useInternalChat:
+ *              type: boolean
+ *            useExternalApi:
+ *              type: boolean
+ *            trial:
+ *              type: boolean
+ *            trialDays:
+ *              type: integer
+ *            recurrence:
+ *              type: string
+ */
 
 export const list = async (req: Request, res: Response): Promise<Response> => {
   const plans: Plan[] = await FindAllPlanService();
