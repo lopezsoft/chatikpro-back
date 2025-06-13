@@ -1,12 +1,10 @@
 import * as Sentry from "@sentry/node";
 import makeWASocket, {
-  AuthenticationState,
   Browsers,
   DisconnectReason,
   WAMessage,
   WAMessageKey,
   WASocket,
-  fetchLatestWaWebVersion,
   fetchLatestBaileysVersion,
   isJidBroadcast,
   isJidGroup,
@@ -58,6 +56,12 @@ const sessions: Session[] = [];
 
 const retriesQrCodeMap = new Map<number, number>();
 
+// Mapa para rastrear los intentos de reconexión y los tiempos de espera para el backoff exponencial
+const reconnectionAttempts = new Map<number, { count: number; nextAttemptAt: number }>();
+const MAX_RECONNECTION_ATTEMPTS = 5; // Número máximo de intentos de reconexión automática
+const INITIAL_RECONNECTION_DELAY_MS = 5000; // Retraso inicial de 5 segundos
+const MAX_RECONNECTION_DELAY_MS = 300000; // Retraso máximo de 5 minutos (5 * 60 * 1000)
+
 export default function msg() {
   return {
     get: (key: WAMessageKey) => {
@@ -95,8 +99,7 @@ export const getWbot = (whatsappId: number): Session => {
 };
 
 export const restartWbot = async (
-  companyId: number,
-  session?: any
+  companyId: number
 ): Promise<void> => {
   try {
     const options: FindOptions = {
@@ -145,9 +148,9 @@ export var dataMessages: any = {};
 export const msgDB = msg();
 
 export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      (async () => {
+  return new Promise((resolve, reject) => { // MODIFICADO: El ejecutor de la promesa ya no es async.
+    (async () => { // IIFE para contener la lógica asíncrona.
+      try { // MODIFICADO: El bloque try ahora envuelve todo el contenido del IIFE.
         const io = getIO();
 
         const whatsappUpdate = await Whatsapp.findOne({
@@ -160,11 +163,11 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
 
         // const { version, isLatest } = await fetchLatestWaWebVersion({});
         const { version, isLatest } = await fetchLatestBaileysVersion();
-        const versionB = [2, 2410, 1];
+        // const versionB = [2, 2410, 1]; // Constante no utilizada eliminada
         // logger.info(`using WA v${version.join(".")}, isLatest: ${isLatest}`);
         logger.info(`Versión: v${version.join(".")}, isLatest: ${isLatest}`);
         logger.info(`Starting session ${name}`);
-        let retriesQrCode = 0;
+        // let retriesQrCode = 0; // Variable no utilizada eliminada
 
         let wsocket: Session = null;
         const { state, saveCreds } = await useMultiFileAuthState(whatsapp);
@@ -357,7 +360,9 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
               `[SESIÓN: ${name} | ID: ${whatsapp.id}] Estado de conexión: ${connection || ""}. Razón: ${lastDisconnect?.error?.message || "N/A"}`
             );
 
-            // Si la conexión se establece exitosamente.
+            //================================================================================
+            // CASO 1: Conexión exitosa
+            //================================================================================
             if (connection === "open") {
               await whatsapp.update({
                 status: "CONNECTED",
@@ -368,7 +373,6 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
                   : "-",
               });
 
-              // Notificar a la UI que la sesión está conectada.
               io.of(String(companyId)).emit(`company-${whatsapp.companyId}-whatsappSession`, {
                 action: "update",
                 session: whatsapp,
@@ -379,105 +383,171 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
                 wsocket.id = whatsapp.id;
                 sessions.push(wsocket);
               }
-              retriesQrCodeMap.delete(id); // Resetea el contador de reintentos de QR al conectar.
+
+              // Al conectar, reseteamos cualquier intento de reconexión previo.
+              reconnectionAttempts.delete(id);
+              retriesQrCodeMap.delete(id);
+
+              // Resolvemos la promesa principal de initWASocket para notificar que el bot está listo.
               resolve(wsocket);
             }
 
-            // Si la conexión se cierra.
+            //================================================================================
+            // CASO 2: La conexión se cierra
+            //================================================================================
             if (connection === "close") {
-              // Extraer el código de estado del error para tomar decisiones.
               const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+              let shouldReconnect = false;
 
-              // Determinar si debemos intentar reconectar automáticamente.
-              const shouldReconnect =
-                statusCode === DisconnectReason.connectionLost ||
-                statusCode === DisconnectReason.connectionClosed ||
-                statusCode === DisconnectReason.timedOut ||
-                statusCode === DisconnectReason.restartRequired;
+              // Usamos un switch para determinar la acción a tomar según el código de error.
+              // Es mucho más legible y mantenible que un if/else complejo.
+              switch (statusCode) {
+                case DisconnectReason.connectionLost:
+                case DisconnectReason.connectionClosed:
+                case DisconnectReason.timedOut:
+                case DisconnectReason.restartRequired:
+                  // Estos son errores recuperables, activamos la reconexión.
+                  shouldReconnect = true;
+                  break;
 
-              logger.info(`[SESIÓN: ${name} | ID: ${whatsapp.id}] ¿Debería reconectar? ${shouldReconnect}. Código de error: ${statusCode}`);
+                case DisconnectReason.loggedOut:
+                  // Desconexión definitiva. La sesión ya no es válida.
+                  logger.error(`[SESIÓN: ${name} | ID: ${id}] Desconexión por Logout. Se requiere nuevo QR.`);
+                  // No se reconecta, se realiza una limpieza completa.
+                  break;
 
-              // Si es un error recuperable, intenta reconectar.
-              if (shouldReconnect) {
-                // En lugar de una llamada única, aquí es donde implementarías una estrategia de backoff.
-                // Por simplicidad, mantenemos la lógica de reintento que ya tienes en `StartWhatsAppSession`.
-                removeWbot(id, false);
-                setTimeout(
-                  () => StartWhatsAppSession(whatsapp, whatsapp.companyId),
-                  5000 // Aumentamos ligeramente el tiempo de espera inicial.
-                );
+                case DisconnectReason.badSession:
+                  // La sesión es inválida. Suele requerir borrar la carpeta de sesión y escanear de nuevo.
+                  logger.error(`[SESIÓN: ${name} | ID: ${id}] Sesión corrupta (badSession). Se requiere nuevo QR.`);
+                  // No se reconecta, limpieza completa.
+                  break;
+
+                case DisconnectReason.connectionReplaced:
+                  // Otra conexión reemplazó a esta. No hacer nada, la otra instancia tomará el control.
+                  logger.warn(`[SESIÓN: ${name} | ID: ${id}] Conexión reemplazada.`);
+                  break;
+
+                case DisconnectReason.multideviceMismatch:
+                  // Este error es ambiguo. A veces se soluciona reiniciando, pero si persiste,
+                  // es un problema de credenciales. Lo trataremos como fatal para estar seguros.
+                  logger.error(`[SESIÓN: ${name} | ID: ${id}] Multidevice Mismatch. Tratado como fatal. Se requiere nuevo QR.`);
+                  break;
+
+                default:
+                  // Para cualquier otro código de error, asumimos que no es recuperable por seguridad.
+                  logger.error(`[SESIÓN: ${name} | ID: ${id}] Desconexión con código no manejado: ${statusCode}.`);
+                  break;
               }
-              // Si es un error definitivo (sesión cerrada, credenciales inválidas, etc.).
-              else {
-                logger.error(`[SESIÓN: ${name} | ID: ${whatsapp.id}] Desconexión no recuperable. Código: ${statusCode}. Se requiere nuevo QR.`);
 
-                await whatsapp.update({ status: "PENDING", session: "" });
-                await DeleteBaileysService(whatsapp.id);
-                await cacheLayer.delFromPattern(`sessions:${whatsapp.id}:*`);
+              if (shouldReconnect) {
+                // --- INICIO DE LÓGICA DE BACKOFF EXPONENCIAL ---
+                const attemptInfo = reconnectionAttempts.get(id) || { count: 0, nextAttemptAt: Date.now() };
 
-                io.of(String(companyId)).emit(`company-${whatsapp.companyId}-whatsappSession`, {
-                  action: "update",
-                  session: whatsapp,
-                });
+                if (attemptInfo.count >= MAX_RECONNECTION_ATTEMPTS) {
+                  logger.error(`[SESIÓN: ${name} | ID: ${id}] Límite de ${MAX_RECONNECTION_ATTEMPTS} reintentos de reconexión alcanzado. Abortando.`);
+                  // Si superamos los reintentos, realizamos la limpieza completa.
+                  await handleFatalDisconnection();
+                  return;
+                }
 
+                attemptInfo.count++;
+                const delay = Math.min(INITIAL_RECONNECTION_DELAY_MS * Math.pow(2, attemptInfo.count - 1), MAX_RECONNECTION_DELAY_MS);
+                attemptInfo.nextAttemptAt = Date.now() + delay;
+                reconnectionAttempts.set(id, attemptInfo);
+
+                logger.info(`[SESIÓN: ${name} | ID: ${id}] Intento de reconexión ${attemptInfo.count}/${MAX_RECONNECTION_ATTEMPTS}. Próximo intento en ${delay / 1000}s.`);
+
+                // Programamos el reinicio.
                 removeWbot(id, false);
+                setTimeout(() => {
+                  StartWhatsAppSession(whatsapp, companyId).catch(err => {
+                    logger.error(`[SESIÓN: ${name} | ID: ${id}] Fallo crítico en StartWhatsAppSession durante el reintento: ${err.message}`);
+                    // Si el propio servicio de reinicio falla, podríamos considerar terminar el proceso
+                    // o realizar una limpieza completa aquí también.
+                    handleFatalDisconnection();
+                  });
+                }, delay);
+                // --- FIN DE LÓGICA DE BACKOFF EXPONENCIAL ---
+              } else if (statusCode !== DisconnectReason.connectionReplaced) {
+                // Si no debemos reconectar (y no fue una simple sustitución de conexión), es un error fatal.
+                await handleFatalDisconnection();
               }
             }
 
-            // Si se genera un nuevo código QR.
+            //================================================================================
+            // CASO 3: Se genera un código QR
+            //================================================================================
             if (qr !== undefined) {
               const retries = retriesQrCodeMap.get(id) || 0;
 
-              // Limita los intentos de generación de QR para evitar bucles infinitos.
               if (retries >= 3) {
-                logger.warn(`[SESIÓN: ${name} | ID: ${whatsapp.id}] Límite de reintentos de QR alcanzado (3). Abortando.`);
-                await whatsapp.update({
-                  status: "DISCONNECTED",
-                  qrcode: "",
-                });
-                await DeleteBaileysService(whatsapp.id);
-                await cacheLayer.delFromPattern(`sessions:${whatsapp.id}:*`);
-
-                io.of(String(companyId)).emit(`company-${whatsapp.companyId}-whatsappSession`, {
-                  action: "update",
-                  session: whatsapp,
-                });
-
-                wsocket.ev.removeAllListeners("connection.update");
-                wsocket.ws.close();
-                retriesQrCodeMap.delete(id);
-              } else {
-                logger.info(`[SESIÓN: ${name} | ID: ${whatsapp.id}] Generando QR. Intento: ${retries + 1}`);
-                retriesQrCodeMap.set(id, retries + 1);
-
-                await whatsapp.update({
-                  qrcode: qr,
-                  status: "qrcode",
-                  number: "",
-                });
-
-                const sessionIndex = sessions.findIndex((s) => s.id === whatsapp.id);
-                if (sessionIndex === -1) {
-                  wsocket.id = whatsapp.id;
-                  sessions.push(wsocket);
-                }
-
-                io.of(String(companyId)).emit(`company-${whatsapp.companyId}-whatsappSession`, {
-                  action: "update",
-                  session: whatsapp,
-                });
+                logger.warn(`[SESIÓN: ${name} | ID: ${id}] Límite de reintentos de QR (3) alcanzado. Abortando.`);
+                await handleFatalDisconnection(); // Usamos la función de limpieza centralizada.
+                return;
               }
+
+              logger.info(`[SESIÓN: ${name} | ID: ${id}] Generando QR. Intento: ${retries + 1}`);
+              retriesQrCodeMap.set(id, retries + 1);
+
+              await whatsapp.update({ qrcode: qr, status: "qrcode", number: "" });
+
+              if (!sessions.some(s => s.id === id)) {
+                wsocket.id = id;
+                sessions.push(wsocket);
+              }
+
+              io.of(String(companyId)).emit(`company-${companyId}-whatsappSession`, {
+                action: "update",
+                session: whatsapp,
+              });
+            }
+
+            // Función de ayuda para centralizar la limpieza en caso de error fatal.
+            async function handleFatalDisconnection() {
+              logger.info(`[SESIÓN: ${name} | ID: ${id}] Ejecutando limpieza completa de la sesión.`);
+              await whatsapp.update({ status: "PENDING", session: "", qrcode: "" });
+              await DeleteBaileysService(id);
+              await cacheLayer.delFromPattern(`sessions:${id}:*`);
+              io.of(String(companyId)).emit(`company-${id}-whatsappSession`, {
+                action: "update",
+                session: whatsapp,
+              });
+              removeWbot(id, false);
+              reconnectionAttempts.delete(id);
+              retriesQrCodeMap.delete(id);
+
+              // Es crucial remover los listeners para evitar fugas de memoria.
+              wsocket.ev.removeAllListeners("connection.update");
+
+              // Rechazamos la promesa para que el código que llamó a initWASocket sepa que falló.
+              reject(new Error("Fatal disconnection"));
             }
           }
         );
         wsocket.ev.on("creds.update", saveCreds);
         // wsocket.store = store;
         // store.bind(wsocket.ev);
-      })();
-    } catch (error) {
-      Sentry.captureException(error);
-      console.log(error);
-      reject(error);
-    }
-  });
+      } catch (error) { // MODIFICADO: Bloque catch robustecido dentro del IIFE.
+        Sentry.captureException(error);
+        logger.error(`[initWASocket] Error durante la inicialización de la sesión para ${whatsapp.name} (ID: ${whatsapp.id}): ${error.message}`, error.stack);
+        // Intenta actualizar el estado de WhatsApp a DISCONNECTED y notificar a la UI.
+        try {
+            const whatsappExists = await Whatsapp.findByPk(whatsapp.id);
+            if (whatsappExists) { // Asegurarse de que el registro de WhatsApp aún existe.
+                await Whatsapp.update({ status: "DISCONNECTED", qrcode: "", session: "" }, { where: { id: whatsapp.id } });
+                const ioInstance = getIO(); // Obtener instancia de IO.
+                // Emitir actualización a la UI.
+                ioInstance.of(String(whatsapp.companyId)).emit(`company-${whatsapp.companyId}-whatsappSession`, {
+                    action: "update",
+                    // Usar .get({ plain: true }) para obtener un objeto simple si whatsapp es una instancia de Sequelize.
+                    session: { ...(whatsapp.get ? whatsapp.get({ plain: true }) : whatsapp), status: "DISCONNECTED", qrcode: "", session: "" }
+                });
+            }
+        } catch (dbUpdateError) {
+            logger.error(`[initWASocket] Falló al actualizar el estado de WhatsApp a DISCONNECTED después de un error de inicialización: ${dbUpdateError.message}`);
+        }
+        reject(error); // Rechaza la promesa principal con el error.
+      }
+    })(); // Invoca el IIFE.
+  }); // Cierra new Promise. El try-catch externo anterior ha sido eliminado/integrado.
 };
