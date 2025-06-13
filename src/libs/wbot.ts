@@ -12,7 +12,6 @@ import makeWASocket, {
   isJidGroup,
   jidNormalizedUser,
   makeCacheableSignalKeyStore,
-  makeInMemoryStore,
   proto,
 } from "@whiskeysockets/baileys";
 import { FindOptions } from "sequelize/types";
@@ -112,7 +111,7 @@ export const restartWbot = async (
     whatsapp.map(async c => {
       const sessionIndex = sessions.findIndex(s => s.id === c.id);
       if (sessionIndex !== -1) {
-        sessions[sessionIndex].ws.close(undefined);
+        sessions[sessionIndex].ws.close();
       }
 
     });
@@ -163,14 +162,11 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
         const { version, isLatest } = await fetchLatestBaileysVersion();
         const versionB = [2, 2410, 1];
         // logger.info(`using WA v${version.join(".")}, isLatest: ${isLatest}`);
-        logger.info(`Versão: v${version.join(".")}, isLatest: ${isLatest}`);
+        logger.info(`Versión: v${version.join(".")}, isLatest: ${isLatest}`);
         logger.info(`Starting session ${name}`);
         let retriesQrCode = 0;
 
         let wsocket: Session = null;
-        const store = makeInMemoryStore({
-          logger: loggerBaileys
-        });
         const { state, saveCreds } = await useMultiFileAuthState(whatsapp);
 
         wsocket = makeWASocket({
@@ -210,10 +206,10 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
             }
             if (message.listMessage?.listType == proto.Message.ListMessage.ListType.PRODUCT_LIST) {
               message = JSON.parse(JSON.stringify(message));
-  
+
               message.listMessage.listType = proto.Message.ListMessage.ListType.SINGLE_SELECT;
             }
-            return message; // Adicionei este retorno que estava faltando
+            return message; // Añadí este retorno que faltaba
           }
         });
 
@@ -229,12 +225,12 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
 
             addLogs({
               fileName: `preparingImportMessagesWppId${whatsapp.id}.txt`, forceNewFile: true,
-              text: `Aguardando conexão para iniciar a importação de mensagens:
-  Whatsapp nome: ${wpp.name}
-  Whatsapp Id: ${wpp.id}
-  Criação do arquivo de logs: ${moment().format("DD/MM/YYYY HH:mm:ss")}
-  Selecionado Data de inicio de importação: ${moment(dateOldLimit).format("DD/MM/YYYY HH:mm:ss")} 
-  Selecionado Data final da importação: ${moment(dateRecentLimit).format("DD/MM/YYYY HH:mm:ss")} 
+              text: `Esperando conexión para iniciar la importación de mensajes:
+  Nombre de Whatsapp: ${wpp.name}
+  Id de Whatsapp: ${wpp.id}
+  Creación del archivo de logs: ${moment().format("DD/MM/YYYY HH:mm:ss")}
+  Fecha de inicio de importación seleccionada: ${moment(dateOldLimit).format("DD/MM/YYYY HH:mm:ss")}
+  Fecha final de importación seleccionada: ${moment(dateRecentLimit).format("DD/MM/YYYY HH:mm:ss")}
   `})
 
             const statusImportMessages = new Date().getTime();
@@ -258,23 +254,23 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
                 if (isValidMsg(msg) && dateOldLimit < timestampMsg && dateRecentLimit > timestampMsg) {
                   if (msg.key?.remoteJid.split("@")[1] != "g.us") {
                     addLogs({
-                      fileName: `preparingImportMessagesWppId${whatsapp.id}.txt`, text: `Adicionando mensagem para pos processamento:
-  Não é Mensagem de GRUPO >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-  Data e hora da mensagem: ${moment(timestampMsg).format("DD/MM/YYYY HH:mm:ss")}
-  Contato da Mensagem : ${msg.key?.remoteJid}
-  Tipo da mensagem : ${getTypeMessage(msg)}
-  
+                      fileName: `preparingImportMessagesWppId${whatsapp.id}.txt`, text: `Añadiendo mensaje para postprocesamiento:
+  No es Mensaje de GRUPO >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+  Fecha y hora del mensaje: ${moment(timestampMsg).format("DD/MM/YYYY HH:mm:ss")}
+  Contacto del Mensaje : ${msg.key?.remoteJid}
+  Tipo de mensaje : ${getTypeMessage(msg)}
+
   `})
                     filteredDateMessages.push(msg)
                   } else {
                     if (wpp?.importOldMessagesGroups) {
                       addLogs({
-                        fileName: `preparingImportMessagesWppId${whatsapp.id}.txt`, text: `Adicionando mensagem para pos processamento:
-  Mensagem de GRUPO >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-  Data e hora da mensagem: ${moment(timestampMsg).format("DD/MM/YYYY HH:mm:ss")}
-  Contato da Mensagem : ${msg.key?.remoteJid}
-  Tipo da mensagem : ${getTypeMessage(msg)}
-  
+                        fileName: `preparingImportMessagesWppId${whatsapp.id}.txt`, text: `Añadiendo mensaje para postprocesamiento:
+  Mensaje de GRUPO >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+  Fecha y hora del mensaje: ${moment(timestampMsg).format("DD/MM/YYYY HH:mm:ss")}
+  Contacto del Mensaje : ${msg.key?.remoteJid}
+  Tipo de mensaje : ${getTypeMessage(msg)}
+
   `})
                       filteredDateMessages.push(msg)
                     }

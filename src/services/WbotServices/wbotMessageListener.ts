@@ -97,7 +97,7 @@ import { IOpenAi } from "../../@types/openai";
 
 const os = require("os");
 
-const request = require("request");
+import request from "request";
 
 let i = 0;
 
@@ -533,139 +533,6 @@ function findCaption(obj) {
 
   return null;
 }
-
-// const downloadMedia = async (msg: proto.IWebMessageInfo, companyId: number, whatsappId: number) => {
-//   const mineType =
-//     msg.message?.imageMessage ||
-//     msg.message?.audioMessage ||
-//     msg.message?.videoMessage ||
-//     msg.message?.stickerMessage ||
-//     msg.message?.documentMessage ||
-//     msg.message?.documentWithCaptionMessage?.message?.documentMessage ||
-//     // msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage ||
-//     // msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage ||
-//     // msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage ||
-//     msg.message?.ephemeralMessage?.message?.audioMessage ||
-//     msg.message?.ephemeralMessage?.message?.documentMessage ||
-//     msg.message?.ephemeralMessage?.message?.videoMessage ||
-//     msg.message?.ephemeralMessage?.message?.stickerMessage ||
-//     msg.message?.ephemeralMessage?.message?.imageMessage ||
-//     msg.message?.viewOnceMessage?.message?.imageMessage ||
-//     msg.message?.viewOnceMessage?.message?.videoMessage ||
-//     msg.message?.ephemeralMessage?.message?.viewOnceMessage?.message?.imageMessage ||
-//     msg.message?.ephemeralMessage?.message?.viewOnceMessage?.message?.videoMessage ||
-//     msg.message?.ephemeralMessage?.message?.viewOnceMessage?.message?.audioMessage ||
-//     msg.message?.ephemeralMessage?.message?.viewOnceMessage?.message?.documentMessage ||
-//     msg.message?.templateMessage?.hydratedTemplate?.imageMessage ||
-//     msg.message?.templateMessage?.hydratedTemplate?.documentMessage ||
-//     msg.message?.templateMessage?.hydratedTemplate?.videoMessage ||
-//     msg.message?.templateMessage?.hydratedFourRowTemplate?.imageMessage ||
-//     msg.message?.templateMessage?.hydratedFourRowTemplate?.documentMessage ||
-//     msg.message?.templateMessage?.hydratedFourRowTemplate?.videoMessage ||
-//     msg.message?.templateMessage?.fourRowTemplate?.imageMessage ||
-//     msg.message?.templateMessage?.fourRowTemplate?.documentMessage ||
-//     msg.message?.templateMessage?.fourRowTemplate?.videoMessage ||
-//     msg.message?.interactiveMessage?.header?.imageMessage ||
-//     msg.message?.interactiveMessage?.header?.documentMessage ||
-//     msg.message?.interactiveMessage?.header?.videoMessage;
-
-//   // eslint-disable-next-line no-nested-ternary
-//   const messageType = msg.message?.documentMessage
-//     ? "document"
-//     : mineType.mimetype.split("/")[0].replace("application", "document")
-//       ? (mineType.mimetype
-//         .split("/")[0]
-//         .replace("application", "document") as MediaType)
-//       : (mineType.mimetype.split("/")[0] as MediaType);
-
-//   let stream: Transform;
-//   let contDownload = 0;
-
-//   while (contDownload < 10 && !stream) {
-//     try {
-//       const { mediaKey, directPath, url } =
-//         msg.message?.imageMessage ||
-//         msg.message?.audioMessage ||
-//         msg.message?.videoMessage ||
-//         msg.message?.stickerMessage ||
-//         msg.message?.documentMessage ||
-//         msg.message?.documentWithCaptionMessage?.message?.documentMessage ||
-//         msg.message?.ephemeralMessage?.message?.audioMessage ||
-//         msg.message?.ephemeralMessage?.message?.documentMessage ||
-//         msg.message?.ephemeralMessage?.message?.videoMessage ||
-//         msg.message?.ephemeralMessage?.message?.stickerMessage ||
-//         msg.message?.ephemeralMessage?.message?.imageMessage ||
-//         msg.message?.viewOnceMessage?.message?.imageMessage ||
-//         msg.message?.viewOnceMessage?.message?.videoMessage ||
-//         msg.message?.ephemeralMessage?.message?.viewOnceMessage?.message?.imageMessage ||
-//         msg.message?.ephemeralMessage?.message?.viewOnceMessage?.message?.videoMessage ||
-//         msg.message?.ephemeralMessage?.message?.viewOnceMessage?.message?.audioMessage ||
-//         msg.message?.ephemeralMessage?.message?.viewOnceMessage?.message?.documentMessage ||
-//         msg.message?.templateMessage?.hydratedTemplate?.imageMessage ||
-//         msg.message?.templateMessage?.hydratedTemplate?.documentMessage ||
-//         msg.message?.templateMessage?.hydratedTemplate?.videoMessage ||
-//         msg.message?.templateMessage?.hydratedFourRowTemplate?.imageMessage ||
-//         msg.message?.templateMessage?.hydratedFourRowTemplate?.documentMessage ||
-//         msg.message?.templateMessage?.hydratedFourRowTemplate?.videoMessage ||
-//         msg.message?.templateMessage?.fourRowTemplate?.imageMessage ||
-//         msg.message?.templateMessage?.fourRowTemplate?.documentMessage ||
-//         msg.message?.templateMessage?.fourRowTemplate?.videoMessage ||
-//         msg.message?.interactiveMessage?.header?.imageMessage ||
-//         msg.message?.interactiveMessage?.header?.documentMessage ||
-//         msg.message?.interactiveMessage?.header?.videoMessage ||
-//         { mediakey: undefined, directPath: undefined, url: undefined };
-//       // eslint-disable-next-line no-await-in-loop
-//       stream = await downloadContentFromMessage(
-//         { mediaKey, directPath, url: directPath ? "" : url },
-//         messageType
-//       );
-
-//     } catch (error) {
-//       contDownload += 1;
-//       // eslint-disable-next-line no-await-in-loop, no-loop-func
-//       await new Promise(resolve => { setTimeout(resolve, 1000 * contDownload * 2) }
-//       );
-
-//       logger.warn(
-//         `>>>> erro ${contDownload} de baixar o arquivo ${msg?.key.id} companie ${companyId} conexão ${whatsappId}`
-//       );
-
-//       if (contDownload === 10) {
-//         logger.warn(
-//           `>>>> erro ao baixar o arquivo ${JSON.stringify(msg)}`
-//         );
-//       }
-//     }
-//   }
-
-//   let buffer = Buffer.from([]);
-//   try {
-//     // eslint-disable-next-line no-restricted-syntax
-//     for await (const chunk of stream) {
-//       buffer = Buffer.concat([buffer, chunk]);
-//     }
-//   } catch (error) {
-//     return { data: "error", mimetype: "", filename: "" };
-//   }
-
-//   if (!buffer) {
-//     Sentry.setExtra("ERR_WAPP_DOWNLOAD_MEDIA", { msg });
-//     Sentry.captureException(new Error("ERR_WAPP_DOWNLOAD_MEDIA"));
-//     throw new Error("ERR_WAPP_DOWNLOAD_MEDIA");
-//   }
-//   let filename = msg.message?.documentMessage?.fileName || "";
-
-//   if (!filename) {
-//     const ext = mineType.mimetype.split("/")[1].split(";")[0];
-//     filename = `${new Date().getTime()}.${ext}`;
-//   }
-//   const media = {
-//     data: buffer,
-//     mimetype: mineType.mimetype,
-//     filename
-//   };
-//   return media;
-// };
 
 const getUnpackedMessage = (msg: proto.IWebMessageInfo) => {
   return (
@@ -4327,7 +4194,7 @@ const handleMessage = async (
     try {
       if (!msg.key.fromMe) {
         console.log("log... 3226");
-        console.log("log... 3227", { ticketTraking});
+        // console.log("log... 3227", { ticketTraking});
         if (ticketTraking !== null && verifyRating(ticketTraking)) {
           handleRating(parseFloat(bodyMessage), ticket, ticketTraking);
           return;
@@ -5058,17 +4925,14 @@ const filterMessages = (msg: WAMessage): boolean => {
   if (msg.message?.protocolMessage?.editedMessage) return true;
   if (msg.message?.protocolMessage) return false;
 
-  if (
-    [
-      WAMessageStubType.REVOKE,
-      WAMessageStubType.E2E_DEVICE_CHANGED,
-      WAMessageStubType.E2E_IDENTITY_CHANGED,
-      WAMessageStubType.CIPHERTEXT
-    ].includes(msg.messageStubType as WAMessageStubType)
-  )
-    return false;
+  return ![
+    WAMessageStubType.REVOKE,
+    WAMessageStubType.E2E_DEVICE_CHANGED,
+    WAMessageStubType.E2E_IDENTITY_CHANGED,
+    WAMessageStubType.CIPHERTEXT
+  ].includes(msg.messageStubType as WAMessageStubType);
 
-  return true;
+
 };
 
 const wbotMessageListener = (wbot: Session, companyId: number): void => {
