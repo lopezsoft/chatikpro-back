@@ -349,130 +349,123 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
           }
 
         }, 2500);
-
-
-
-
+        // Escucha eventos de mensajes entrantes.
         wsocket.ev.on(
           "connection.update",
           async ({ connection, lastDisconnect, qr }) => {
             logger.info(
-              `Socket  ${name} Connection Update ${connection || ""} ${lastDisconnect ? lastDisconnect.error.message : ""
-              }`
+              `[SESIÓN: ${name} | ID: ${whatsapp.id}] Estado de conexión: ${connection || ""}. Razón: ${lastDisconnect?.error?.message || "N/A"}`
             );
 
-            if (connection === "close") {
-              console.log("DESCONECTOU", JSON.stringify(lastDisconnect, null, 2))
-              logger.info(
-                `Socket  ${name} Connection Update ${connection || ""} ${lastDisconnect ? lastDisconnect.error.message : ""
-                }`
-              );
-              if ((lastDisconnect?.error as Boom)?.output?.statusCode === 403) {
-                await whatsapp.update({ status: "PENDING", session: "" });
-                await DeleteBaileysService(whatsapp.id);
-                await cacheLayer.delFromPattern(`sessions:${whatsapp.id}:*`);
-                io.of(String(companyId))
-                  .emit(`company-${whatsapp.companyId}-whatsappSession`, {
-                    action: "update",
-                    session: whatsapp
-                  });
-                removeWbot(id, false);
-              }
-              if (
-                (lastDisconnect?.error as Boom)?.output?.statusCode !==
-                DisconnectReason.loggedOut
-              ) {
-                removeWbot(id, false);
-                setTimeout(
-                  () => StartWhatsAppSession(whatsapp, whatsapp.companyId),
-                  2000
-                );
-              } else {
-                await whatsapp.update({ status: "PENDING", session: "" });
-                await DeleteBaileysService(whatsapp.id);
-                await cacheLayer.delFromPattern(`sessions:${whatsapp.id}:*`);
-                io.of(String(companyId))
-                  .emit(`company-${whatsapp.companyId}-whatsappSession`, {
-                    action: "update",
-                    session: whatsapp
-                  });
-                removeWbot(id, false);
-                setTimeout(
-                  () => StartWhatsAppSession(whatsapp, whatsapp.companyId),
-                  2000
-                );
-              }
-            }
-
+            // Si la conexión se establece exitosamente.
             if (connection === "open") {
               await whatsapp.update({
                 status: "CONNECTED",
                 qrcode: "",
                 retries: 0,
-                number:
-                  wsocket.type === "md"
-                    ? jidNormalizedUser((wsocket as WASocket).user.id).split("@")[0]
-                    : "-"
+                number: wsocket.type === "md"
+                  ? jidNormalizedUser((wsocket as WASocket).user.id).split("@")[0]
+                  : "-",
               });
 
-              io.of(String(companyId))
-                .emit(`company-${whatsapp.companyId}-whatsappSession`, {
-                  action: "update",
-                  session: whatsapp
-                });
+              // Notificar a la UI que la sesión está conectada.
+              io.of(String(companyId)).emit(`company-${whatsapp.companyId}-whatsappSession`, {
+                action: "update",
+                session: whatsapp,
+              });
 
-              const sessionIndex = sessions.findIndex(
-                s => s.id === whatsapp.id
-              );
+              const sessionIndex = sessions.findIndex((s) => s.id === whatsapp.id);
               if (sessionIndex === -1) {
                 wsocket.id = whatsapp.id;
                 sessions.push(wsocket);
               }
-
+              retriesQrCodeMap.delete(id); // Resetea el contador de reintentos de QR al conectar.
               resolve(wsocket);
             }
 
-            if (qr !== undefined) {
-              if (retriesQrCodeMap.get(id) && retriesQrCodeMap.get(id) >= 3) {
-                await whatsappUpdate.update({
-                  status: "DISCONNECTED",
-                  qrcode: ""
-                });
-                await DeleteBaileysService(whatsappUpdate.id);
+            // Si la conexión se cierra.
+            if (connection === "close") {
+              // Extraer el código de estado del error para tomar decisiones.
+              const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+
+              // Determinar si debemos intentar reconectar automáticamente.
+              const shouldReconnect =
+                statusCode === DisconnectReason.connectionLost ||
+                statusCode === DisconnectReason.connectionClosed ||
+                statusCode === DisconnectReason.timedOut ||
+                statusCode === DisconnectReason.restartRequired;
+
+              logger.info(`[SESIÓN: ${name} | ID: ${whatsapp.id}] ¿Debería reconectar? ${shouldReconnect}. Código de error: ${statusCode}`);
+
+              // Si es un error recuperable, intenta reconectar.
+              if (shouldReconnect) {
+                // En lugar de una llamada única, aquí es donde implementarías una estrategia de backoff.
+                // Por simplicidad, mantenemos la lógica de reintento que ya tienes en `StartWhatsAppSession`.
+                removeWbot(id, false);
+                setTimeout(
+                  () => StartWhatsAppSession(whatsapp, whatsapp.companyId),
+                  5000 // Aumentamos ligeramente el tiempo de espera inicial.
+                );
+              }
+              // Si es un error definitivo (sesión cerrada, credenciales inválidas, etc.).
+              else {
+                logger.error(`[SESIÓN: ${name} | ID: ${whatsapp.id}] Desconexión no recuperable. Código: ${statusCode}. Se requiere nuevo QR.`);
+
+                await whatsapp.update({ status: "PENDING", session: "" });
+                await DeleteBaileysService(whatsapp.id);
                 await cacheLayer.delFromPattern(`sessions:${whatsapp.id}:*`);
-                io.of(String(companyId))
-                  .emit(`company-${whatsapp.companyId}-whatsappSession`, {
-                    action: "update",
-                    session: whatsappUpdate
-                  });
+
+                io.of(String(companyId)).emit(`company-${whatsapp.companyId}-whatsappSession`, {
+                  action: "update",
+                  session: whatsapp,
+                });
+
+                removeWbot(id, false);
+              }
+            }
+
+            // Si se genera un nuevo código QR.
+            if (qr !== undefined) {
+              const retries = retriesQrCodeMap.get(id) || 0;
+
+              // Limita los intentos de generación de QR para evitar bucles infinitos.
+              if (retries >= 3) {
+                logger.warn(`[SESIÓN: ${name} | ID: ${whatsapp.id}] Límite de reintentos de QR alcanzado (3). Abortando.`);
+                await whatsapp.update({
+                  status: "DISCONNECTED",
+                  qrcode: "",
+                });
+                await DeleteBaileysService(whatsapp.id);
+                await cacheLayer.delFromPattern(`sessions:${whatsapp.id}:*`);
+
+                io.of(String(companyId)).emit(`company-${whatsapp.companyId}-whatsappSession`, {
+                  action: "update",
+                  session: whatsapp,
+                });
+
                 wsocket.ev.removeAllListeners("connection.update");
                 wsocket.ws.close();
-                wsocket = null;
                 retriesQrCodeMap.delete(id);
               } else {
-                logger.info(`Session QRCode Generate ${name}`);
-                retriesQrCodeMap.set(id, (retriesQrCode += 1));
+                logger.info(`[SESIÓN: ${name} | ID: ${whatsapp.id}] Generando QR. Intento: ${retries + 1}`);
+                retriesQrCodeMap.set(id, retries + 1);
 
                 await whatsapp.update({
                   qrcode: qr,
                   status: "qrcode",
-                  retries: 0,
-                  number: ""
+                  number: "",
                 });
-                const sessionIndex = sessions.findIndex(
-                  s => s.id === whatsapp.id
-                );
 
+                const sessionIndex = sessions.findIndex((s) => s.id === whatsapp.id);
                 if (sessionIndex === -1) {
                   wsocket.id = whatsapp.id;
                   sessions.push(wsocket);
                 }
 
-                io.of(String(companyId))
-                  .emit(`company-${whatsapp.companyId}-whatsappSession`, {
-                    action: "update",
-                    session: whatsapp
-                  });
+                io.of(String(companyId)).emit(`company-${whatsapp.companyId}-whatsappSession`, {
+                  action: "update",
+                  session: whatsapp,
+                });
               }
             }
           }
