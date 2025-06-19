@@ -45,7 +45,7 @@ const msgCache = new NodeCache({
 });
 
 const loggerBaileys = MAIN_LOGGER.child({});
-loggerBaileys.level = "error";
+loggerBaileys.level = "info";
 
 type Session = WASocket & {
   id?: number;
