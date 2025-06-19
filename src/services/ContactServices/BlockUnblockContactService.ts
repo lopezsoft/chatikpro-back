@@ -75,7 +75,7 @@ const BlockUnblockContactService = async ({
             //const whatsappCompany = await GetDefaultWhatsApp(Number(companyId))
 
             const whatsappCompany = null;
-            
+
             const wbot = getWbot(whatsappCompany.id);
 
             const jid = createJid(contact.number);

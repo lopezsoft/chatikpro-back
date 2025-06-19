@@ -34,7 +34,7 @@ const update = async (req: Request, res: Response): Promise<Response> => {
   const whatsapp = await Whatsapp.findOne({ where: { id: whatsappId, companyId } });
 
   await whatsapp.update({ session: "" });
-  
+
   if (whatsapp.channel === "whatsapp") {
     await StartWhatsAppSession(whatsapp, companyId);
   }

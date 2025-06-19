@@ -213,11 +213,11 @@ export const ActionsWebhookService = async (
           nodeSelected = otherNode;
         }
       }
-        
+
       if (nodeSelected.type === "message") {
-        
+
         let msg;
-        
+
         const webhook = ticket.dataWebhook
 
         if (webhook && webhook.hasOwnProperty("variables")) {
@@ -234,7 +234,7 @@ export const ActionsWebhookService = async (
           number: numberClient,
           body: msg.body
         });
-        
+
 
         //TESTE BOTÃO
         //await SendMessageFlow(whatsapp, {

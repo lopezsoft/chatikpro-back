@@ -11,7 +11,7 @@ const CheckIsValidContact = async (number: string, companyId: number): Promise<v
     const [result] = await (wbot as WASocket).onWhatsApp(
       `${number}@s.whatsapp.net`
     );
-    
+
     if (!result && !result?.exists) {
       throw new AppError("invalidNumber");
     }

@@ -168,7 +168,7 @@ const SendWhatsAppMedia = async ({
       };
       bodyTicket = "🎥 Arquivo de vídeo"
     } else if (typeMessage === "audio") {
-      
+
       const typeAudio = true; //media.originalname.includes("audio-record-site");
       if (typeAudio) {
         const convert = await processAudio(media.path, companyId);

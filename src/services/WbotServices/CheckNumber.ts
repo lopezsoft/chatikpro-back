@@ -18,7 +18,7 @@ const CheckContactNumber = async (
         jid: grupoMeta.id,
         exists: true
       }
-    ]; 
+    ];
   } else {
     numberArray = await wbot.onWhatsApp(`${number}@s.whatsapp.net`);
   }

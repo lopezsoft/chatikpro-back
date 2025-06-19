@@ -271,7 +271,7 @@ async function handleSendScheduledMessage(job) {
       const hora = dataExistente.getHours();
       const fusoHorario = dataExistente.getTimezoneOffset();
 
-      let novaData = new Date(dataExistente); 
+      let novaData = new Date(dataExistente);
 
       console.log(unidadeIntervalo)
       if (unidadeIntervalo !== "minuts") {
@@ -1391,7 +1391,7 @@ async function handleRandomUser() {
                     //await ticket.reload();
                     logger.info(`Ticket ID ${ticket.id} atualizado para UserId ${randomUserId} - ${ticket.updatedAt}`);
                   } else {
-                    //logger.info(`Ticket ID ${ticket.id} NOT updated with UserId ${randomUserId} - ${ticket.updatedAt}`);            
+                    //logger.info(`Ticket ID ${ticket.id} NOT updated with UserId ${randomUserId} - ${ticket.updatedAt}`);
                   }
 
                 } else if (userIds.includes(userId)) {
@@ -1423,7 +1423,7 @@ async function handleRandomUser() {
 
                         logger.info(`Ticket ID ${ticket.id} atualizado para UserId ${randomUserId} - ${ticket.updatedAt}`);
                       } else {
-                        //logger.info(`Ticket ID ${ticket.id} NOT updated with UserId ${randomUserId} - ${ticket.updatedAt}`);            
+                        //logger.info(`Ticket ID ${ticket.id} NOT updated with UserId ${randomUserId} - ${ticket.updatedAt}`);
                       }
 
                     }
@@ -1564,34 +1564,34 @@ async function handleWhatsapp() {
 }
 
 async function handleInvoiceCreate() {
-  // Logger english 
+  // Logger english
   logger.info("Generating invoice...");
   const job = new CronJob('*/30 * * * * *', async () => {
     const companies = await Company.findAll();
     companies.map(async c => {
-    
+
       const status = c.status;
-      const dueDate = c.dueDate; 
+      const dueDate = c.dueDate;
       const date = moment(dueDate).format();
       const timestamp = moment().format();
       const hoje = moment().format("DD/MM/yyyy");
       const vencimento = moment(dueDate).format("DD/MM/yyyy");
       const diff = moment(vencimento, "DD/MM/yyyy").diff(moment(hoje, "DD/MM/yyyy"));
       const dias = moment.duration(diff).asDays();
-    
+
       if(status === true){
       	//logger.info(`EMPRESA: ${c.id} está ATIVA com vencimento em: ${vencimento} | ${dias}`);
-      
+
       	//Verifico se a empresa está a mais de 10 dias sem pagamento
-        
+
         if(dias <= -3){
-       
+
           logger.info(`EMPRESA: ${c.id} está VENCIDA A MAIS DE 3 DIAS... INATIVANDO... ${dias}`);
           c.status = false;
           await c.save(); // Save the updated company record
           logger.info(`EMPRESA: ${c.id} foi INATIVADA.`);
           logger.info(`EMPRESA: ${c.id} Desativando conexões com o WhatsApp...`);
-          
+
           try {
     		const whatsapps = await Whatsapp.findAll({
       		where: {
@@ -1607,53 +1607,53 @@ async function handleInvoiceCreate() {
                 	logger.info(`EMPRESA: ${c.id} teve o WhatsApp ${whatsapp.id} desconectado...`);
   				}
     		}
-          
+
   		  } catch (error) {
     		// Lidar com erros, se houver
     		console.error('Erro ao buscar os IDs de WhatsApp:', error);
     		throw error;
   		  }
-        
+
         }else{ // ELSE if(dias <= -3){
-        
+
           const plan = await Plan.findByPk(c.planId);
-        
+
           const sql = `SELECT * FROM "Invoices" WHERE "companyId" = ${c.id} AND "status" = 'open';`
           const openInvoices = await sequelize.query(sql, { type: QueryTypes.SELECT }) as { id: number, dueDate: Date }[];
           const existingInvoice = openInvoices.find(invoice => moment(invoice.dueDate).format("DD/MM/yyyy") === vencimento);
-        
+
           if (existingInvoice) {
             // Due date already exists, no action needed
             //logger.info(`Fatura Existente`);
-        
+
           } else if (openInvoices.length > 0) {
             const updateSql = `UPDATE "Invoices" SET "dueDate" = '${date}' WHERE "id" = ${openInvoices[0].id};`;
             await sequelize.query(updateSql, { type: QueryTypes.UPDATE });
-        
+
             logger.info(`Fatura Atualizada ID: ${openInvoices[0].id}`);
-        
+
           } else {
             const valuePlan = plan.amount.replace(",", ".");
             const sql = `INSERT INTO "Invoices" ("companyId", "dueDate", detail, status, value, users, connections, queues, "updatedAt", "createdAt")
             VALUES (${c.id}, '${date}', '${plan.name}', 'open', ${valuePlan}, ${plan.users}, ${plan.connections}, ${plan.queues}, '${timestamp}', '${timestamp}');`
             const invoiceInsert = await sequelize.query(sql, { type: QueryTypes.INSERT });
-        
+
             logger.info(`Fatura Gerada para o cliente: ${c.id}`);
             // Rest of the code for sending email
           }
-        
-          
-        
-        
+
+
+
+
         } // if(dias <= -6){
-        
+
       }else{ // ELSE if(status === true){
-      
+
       	//logger.info(`EMPRESA: ${c.id} está INATIVA`);
-      
+
       }
-    
-    
+
+
     });
   });
   job.start();
