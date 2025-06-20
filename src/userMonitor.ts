@@ -55,10 +55,10 @@ export async function initUserMonitorQueues() {
     "VerifyLoginStatus",
     {},
     {
-      repeat: { cron: "* * * * *", key: "verify-login-status"},
+      repeat: { cron: "* * * * *"},
       removeOnComplete: { age: 60 * 60, count: 10 },
       removeOnFail: { age: 60 * 60, count: 10 }
     }
   );
-  logger.info("Queue: monitoramento de status de usuário inicializado");
+  logger.info("Fila UserMonitor iniciada com verificação de login a cada minuto.");
 }

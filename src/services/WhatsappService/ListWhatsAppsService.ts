@@ -1,43 +1,16 @@
-import { FindOptions } from "sequelize/types";
-import Queue from "../../models/Queue";
+import { WhatsappRepository } from "../../libs/wbot/WhatsappRepository";
 import Whatsapp from "../../models/Whatsapp";
-import Prompt from "../../models/Prompt";
 
 interface Request {
   companyId: number;
   session?: number | string;
 }
 
-const ListWhatsAppsService = async ({
-  session,
-  companyId
-}: Request): Promise<Whatsapp[]> => {
-  const options: FindOptions = {
-    where: {
-      companyId
-    },
-    include: [
-      {
-        model: Queue,
-        as: "queues",
-        attributes: ["id", "name", "color", "greetingMessage"]
-      },
-      {
-        model: Prompt,
-        as: "prompt",
-      }
-    ]
-  };
+const ListWhatsAppsService = async ({ companyId, session }: Request): Promise<Whatsapp[]> => {
+  const repository = new WhatsappRepository();
+  const excludeSessionData = session !== undefined && session == 0;
 
-  if (session !== undefined && session == 0) {
-    options.attributes = { exclude: ["session"] };
-  }
-
-  const whatsapps = await Whatsapp.findAll(options);
-
-  return whatsapps;
+  return await repository.findAllByCompany(companyId, excludeSessionData);
 };
-
-
 
 export default ListWhatsAppsService;

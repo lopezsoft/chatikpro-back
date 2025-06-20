@@ -4,6 +4,9 @@ import Whatsapp from "../../models/Whatsapp";
 import DeleteBaileysService from "../../services/BaileysServices/DeleteBaileysService";
 import AppError from "../../errors/AppError";
 import cacheLayer from "../cache";
+import { FindOptions } from "sequelize/types";
+import Queue from "../../models/Queue";
+import Prompt from "../../models/Prompt";
 
 // Interfaz que define el contrato del repositorio
 export interface IWhatsappRepository {
@@ -12,6 +15,8 @@ export interface IWhatsappRepository {
   delete(id: number): Promise<void>;
   clearSessionCache(id: number): Promise<void>;
 }
+
+
 
 // Implementación concreta usando Sequelize
 export class WhatsappRepository implements IWhatsappRepository {
@@ -37,4 +42,29 @@ export class WhatsappRepository implements IWhatsappRepository {
   public async clearSessionCache(id: number): Promise<void> {
     await cacheLayer.delFromPattern(`sessions:${id}:*`);
   }
+
+  public async findAllByCompany(companyId: number, excludeSession = false): Promise<Whatsapp[]> {
+    const options: FindOptions = {
+      where: { companyId },
+      include: [
+        {
+          model: Queue,
+          as: "queues",
+          attributes: ["id", "name", "color", "greetingMessage"]
+        },
+        {
+          model: Prompt,
+          as: "prompt",
+        }
+      ]
+    };
+
+    if (excludeSession) {
+      options.attributes = { exclude: ["session"] };
+    }
+
+    return Whatsapp.findAll(options);
+  }
 }
+
+

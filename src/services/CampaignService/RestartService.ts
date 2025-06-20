@@ -1,5 +1,5 @@
 import Campaign from "../../models/Campaign";
-import { campaignQueue } from "../../queues";
+import { campaignQueue } from "../../queues/definitions";
 
 export async function RestartService(id: number) {
   const campaign = await Campaign.findByPk(id);

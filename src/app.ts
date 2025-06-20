@@ -16,7 +16,6 @@ import uploadConfig from "./config/upload";
 import AppError from "./errors/AppError";
 import routes from "./routes";
 import logger from "./utils/logger";
-import { messageQueue, sendScheduledMessages } from "./queues"; // Asumo que son exportaciones nombradas
 import BullQueue from "./libs/queue"; // Asumo que es una exportación default o un objeto
 // import BullBoard from 'bull-board'; // Corregido: bull-board/api y bull-board/express
 import { createBullBoard } from '@bull-board/api';
@@ -26,6 +25,7 @@ import { ExpressAdapter } from '@bull-board/express';
 import basicAuth from 'basic-auth';
 
 import { setupSwagger } from './config/swagger';
+import { messageQueue, sendScheduledMessages } from "./queues/definitions";
 
 // Carga de variables de entorno (si no se hace en ./bootstrap)
 // Es buena práctica hacerlo lo más pronto posible.

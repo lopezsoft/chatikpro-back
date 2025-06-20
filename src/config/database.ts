@@ -26,7 +26,8 @@ module.exports = {
     max: parseInt(process.env.DB_POOL_MAX) || 100,
     min: parseInt(process.env.DB_POOL_MIN) || 15,
     acquire: parseInt(process.env.DB_POOL_ACQUIRE) || 30000,
-    idle: parseInt(process.env.DB_POOL_IDLE) || 600000
+    idle: parseInt(process.env.DB_POOL_IDLE) || 10000,
+    evict: parseInt(process.env.DB_POOL_EVICT) || 10000
   },
   dialect: process.env.DB_DIALECT || "postgres",
   timezone: process.env.TZ || 'America/Bogota',

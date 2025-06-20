@@ -4,7 +4,6 @@ import { getIO } from "../../libs/socket";
 import { BaileysClient } from "../../libs/wbot/BaileysClient";
 import { WhatsappRepository } from "../../libs/wbot/WhatsappRepository";
 import Whatsapp from "../../models/Whatsapp";
-import AppError from "../../errors/AppError";
 import logger from "../../utils/logger";
 import * as Sentry from "@sentry/node";
 import { sessionManager } from "../../libs/wbot/SessionManager";

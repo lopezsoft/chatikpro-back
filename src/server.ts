@@ -8,8 +8,9 @@ import logger from "./utils/logger";
 import { StartAllWhatsAppsSessions } from "./services/WbotServices/StartAllWhatsAppsSessions";
 import Company from "./models/Company";
 import BullQueue from './libs/queue';
-import { startQueueProcess } from "./queues";
 import { Server } from 'http';
+import { initializeAllCrons } from "./cron";
+import { startAllQueues } from "./queues";
 
 const PORT = process.env.PORT || 3000; // Puerto por defecto si no está en .env
 const USE_HTTPS = process.env.CERTIFICADOS === "true";
@@ -65,7 +66,8 @@ async function postListenSetup() {
       "Todas las promesas de inicio de sesión de WhatsApp han sido procesadas."
     );
 
-    await startQueueProcess();
+    initializeAllCrons(); // Inicializar todos los cron jobs
+    startAllQueues();
     logger.info("Proceso de cola principal iniciado.");
 
     if (process.env.REDIS_URI_ACK && process.env.REDIS_URI_ACK !== "") {

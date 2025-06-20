@@ -1,7 +1,7 @@
 import { Op } from "sequelize";
 import Campaign from "../../models/Campaign";
 import CampaignShipping from "../../models/CampaignShipping";
-import { campaignQueue } from "../../queues";
+import { campaignQueue } from "../../queues/definitions";
 
 export async function CancelService(id: number) {
   const campaign = await Campaign.findByPk(id);

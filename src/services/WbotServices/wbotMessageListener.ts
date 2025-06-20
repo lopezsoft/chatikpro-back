@@ -50,7 +50,6 @@ import VerifyCurrentSchedule from "../CompanyService/VerifyCurrentSchedule";
 import Campaign from "../../models/Campaign";
 import CampaignShipping from "../../models/CampaignShipping";
 import { Op } from "sequelize";
-import { campaignQueue, parseToMilliseconds, randomValue } from "../../queues";
 import User from "../../models/User";
 import { sayChatbot } from "./ChatBotListener";
 import MarkDeleteWhatsAppMessage from "./MarkDeleteWhatsAppMessage";
@@ -98,6 +97,8 @@ import { IOpenAi } from "../../@types/openai";
 const os = require("os");
 
 import request from "request";
+import { campaignQueue } from "../../queues/definitions";
+import { parseToMilliseconds, randomValue } from "../../helpers/utils";
 
 let i = 0;
 
