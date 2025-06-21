@@ -8,12 +8,9 @@ import Message from "../models/Message";
 import Whatsapp from "../models/Whatsapp";
 import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../services/TicketServices/FindOrCreateTicketService";
-import CheckIsValidContact from "../services/WbotServices/CheckIsValidContact";
 import CheckContactNumber from "../services/WbotServices/CheckNumber";
 import SendWhatsAppMedia, { getMessageOptions } from "../services/WbotServices/SendWhatsAppMedia";
 import UpdateTicketService from "../services/TicketServices/UpdateTicketService";
-import { getWbot } from "../libs/wbot";
-import SendWhatsAppMessageLink from "../services/WbotServices/SendWhatsAppMessageLink";
 import SendWhatsAppMessageAPI from "../services/WbotServices/SendWhatsAppMessageAPI";
 import SendWhatsAppMediaImage from "../services/WbotServices/SendWhatsappMediaImage";
 import ApiUsages from "../models/ApiUsages";
@@ -25,17 +22,13 @@ import { isNil } from "lodash";
 import { verifyMediaMessage, verifyMessage } from "../services/WbotServices/wbotMessageListener";
 import ShowQueueService from "../services/QueueService/ShowQueueService";
 import path from "path";
-import Contact from "../models/Contact";
 import FindOrCreateATicketTrakingService from "../services/TicketServices/FindOrCreateATicketTrakingService";
 import { Mutex } from "async-mutex";
+import { sessionManager } from "../libs/wbot/SessionManager";
 
 type WhatsappData = {
   whatsappId: number;
 };
-
-export class OnWhatsAppDto {
-  constructor(public readonly jid: string, public readonly exists: boolean) { }
-}
 
 type MessageData = {
   body: string;
@@ -158,76 +151,6 @@ function createJid(number: string) {
     : `${formatBRNumber(number)}@s.whatsapp.net`;
 }
 
-// export const indexLink = async (req: Request, res: Response): Promise<Response> => {
-//   const newContact: ContactData = req.body;
-//   const { whatsappId }: WhatsappData = req.body;
-//   const { msdelay }: any = req.body;
-//   const url = req.body.url;
-//   const caption = req.body.caption;
-
-//   const authHeader = req.headers.authorization;
-//   const [, token] = authHeader.split(" ");
-//   const whatsapp = await Whatsapp.findOne({ where: { token } });
-//   const companyId = whatsapp.companyId;
-
-//   newContact.number = newContact.number.replace("-", "").replace(" ", "");
-
-//   const schema = Yup.object().shape({
-//     number: Yup.string()
-//       .required()
-//       .matches(/^\d+$/, "Invalid number format. Only numbers is allowed.")
-//   });
-
-//   try {
-//     await schema.validate(newContact);
-//   } catch (err: any) {
-//     throw new AppError(err.message);
-//   }
-
-//   const contactAndTicket = await createContact(whatsappId, companyId, newContact.number);
-
-//   if (!contactAndTicket) {
-//     throw new AppError("Cliente em outro atendimento")
-//   }
-//   await SendWhatsAppMessageLink({ whatsappId, contact: contactAndTicket.contact, url, caption, msdelay });
-
-//   setTimeout(async () => {
-//     const { dateToClient } = useDate();
-
-//     const hoje: string = dateToClient(new Date())
-//     const timestamp = moment().format();
-
-//     const exist = await ApiUsages.findOne({
-//       where: {
-//         dateUsed: hoje,
-//         companyId: companyId
-//       }
-//     });
-
-//     if (exist) {
-//       await exist.update({
-//         usedPDF: exist.dataValues["usedPDF"] + 1,
-//         UsedOnDay: exist.dataValues["UsedOnDay"] + 1,
-//         updatedAt: timestamp
-//       });
-//     } else {
-//       const usage = await ApiUsages.create({
-//         companyId: companyId,
-//         dateUsed: hoje,
-//       });
-
-//       await usage.update({
-//         usedPDF: usage.dataValues["usedPDF"] + 1,
-//         UsedOnDay: usage.dataValues["UsedOnDay"] + 1,
-//         updatedAt: timestamp
-//       });
-//     }
-
-//   }, 100);
-
-//   return res.send({ status: "SUCCESS" });
-// };
-
 export const index = async (req: Request, res: Response): Promise<Response> => {
   const newContact: ContactData = req.body;
 
@@ -264,7 +187,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
     throw new AppError(err.message);
   }
 
-  const wbot = await getWbot(whatsapp.id);
+  const wbot = await sessionManager.getSession(whatsapp.id);
 
   let user
   if (userId?.toString() !== "" && !isNaN(userId)) {
@@ -337,7 +260,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
             }
           })
         );
-        await verifyMediaMessage(sentMessage, contactAndTicket, contactAndTicket.contact, null, false, false, wbot);
+        await verifyMediaMessage(sentMessage, contactAndTicket, contactAndTicket.contact, null, false, false, wbot.getSession());
       } catch (error) {
         throw new AppError("Error sending API media: " + error.message);
       }
@@ -561,7 +484,7 @@ export const checkNumber = async (req: Request, res: Response): Promise<Response
   const number = newContact.number.replace("-", "").replace(" ", "");
 
   const whatsappDefault = await GetDefaultWhatsApp(whatsapp.id, companyId);
-  const wbot = getWbot(whatsappDefault.id);
+  const wbot = sessionManager.getSession(whatsappDefault.id);
   const jid = createJid(number);
 
   try {
@@ -613,33 +536,4 @@ export const checkNumber = async (req: Request, res: Response): Promise<Response
     return res.status(400).json({ existsInWhatsapp: false, number: jid, error: "Not exists on Whatsapp" });
   }
 
-};
-
-export const indexWhatsappsId = async (req: Request, res: Response): Promise<Response> => {
-
-  return res.status(200).json('oi');
-
-  // const { companyId } = req.user;
-  // const whatsapps = await ListWhatsAppsService({ companyId });
-
-  // let wpp = [];
-
-  // if (whatsapps.length > 0) {
-  //     whatsapps.forEach(whatsapp => {
-
-  //         let wppString;
-  //         wppString = {
-  //             id: whatsapp.id,
-  //             name: whatsapp.name,
-  //             status: whatsapp.status,
-  //             isDefault: whatsapp.isDefault,
-  //             number: whatsapp.number
-  //         }
-
-  //         wpp.push(wppString)
-
-  //     });
-  // }
-
-  // return res.status(200).json(wpp);
 };

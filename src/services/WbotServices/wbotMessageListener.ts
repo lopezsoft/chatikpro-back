@@ -1,30 +1,25 @@
 import path, { join } from "path";
 import { promisify } from "util";
-import { readFile, writeFile } from "fs";
-import fs from "fs";
+import fs, { readFile, writeFile } from "fs";
 import * as Sentry from "@sentry/node";
 import { isNil, isNull } from "lodash";
 import { REDIS_URI_MSG_CONN } from "../../config/redis";
-import axios from "axios";
 
 import {
+  delay,
   downloadMediaMessage,
   extractMessageContent,
+  generateWAMessageContent,
+  generateWAMessageFromContent,
   getContentType,
   GroupMetadata,
   jidNormalizedUser,
-  delay,
-  MediaType,
   MessageUpsertType,
   proto,
   WAMessage,
   WAMessageStubType,
   WAMessageUpdate,
-  WASocket,
-  downloadContentFromMessage,
-  AnyMessageContent,
-  generateWAMessageContent,
-  generateWAMessageFromContent
+  WASocket
 } from "@whiskeysockets/baileys";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
@@ -55,7 +50,6 @@ import { sayChatbot } from "./ChatBotListener";
 import MarkDeleteWhatsAppMessage from "./MarkDeleteWhatsAppMessage";
 import ListUserQueueServices from "../UserQueueServices/ListUserQueueServices";
 import cacheLayer from "../../libs/cache";
-import { addLogs } from "../../helpers/addLogs";
 import SendWhatsAppMedia, { getMessageOptions } from "./SendWhatsAppMedia";
 
 import ShowQueueIntegrationService from "../QueueIntegrationServices/ShowQueueIntegrationService";
@@ -69,36 +63,25 @@ import ShowFileService from "../FileServices/ShowService";
 
 import OpenAI from "openai";
 import ffmpeg from "fluent-ffmpeg";
-import {
-  SpeechConfig,
-  SpeechSynthesizer,
-  AudioConfig
-} from "microsoft-cognitiveservices-speech-sdk";
+import { AudioConfig, SpeechConfig, SpeechSynthesizer } from "microsoft-cognitiveservices-speech-sdk";
 import typebotListener from "../TypebotServices/typebotListener";
 import Tag from "../../models/Tag";
 import TicketTag from "../../models/TicketTag";
-import pino from "pino";
 import BullQueues from "../../libs/queue";
-import { Transform } from "stream";
-import { msgDB } from "../../libs/wbot";
-import {CheckSettings1, CheckCompanySetting} from "../../helpers/CheckSettings";
-import { title } from "process";
+import { CheckSettings1 } from "../../helpers/CheckSettings";
 import { FlowBuilderModel } from "../../models/FlowBuilder";
 import { IConnections, INodes } from "../WebhookService/DispatchWebHookService";
-import { FlowDefaultModel } from "../../models/FlowDefault";
 import { ActionsWebhookService } from "../WebhookService/ActionsWebhookService";
 import { WebhookModel } from "../../models/Webhook";
-import { add, differenceInMilliseconds } from "date-fns";
+import { differenceInMilliseconds } from "date-fns";
 import { FlowCampaignModel } from "../../models/FlowCampaign";
-import ShowTicketService from "../TicketServices/ShowTicketService";
 import { handleOpenAi } from "../IntegrationsServices/OpenAiService";
 import { IOpenAi } from "../../@types/openai";
-
-const os = require("os");
 
 import request from "request";
 import { campaignQueue } from "../../queues/definitions";
 import { parseToMilliseconds, randomValue } from "../../helpers/utils";
+import { msgDB } from "../../helpers/msg";
 
 let i = 0;
 
@@ -127,11 +110,6 @@ const sessionsOpenAi: SessionOpenAi[] = [];
 
 const writeFileAsync = promisify(writeFile);
 
-function removeFile(directory) {
-  fs.unlink(directory, error => {
-    if (error) throw error;
-  });
-}
 
 const getTimestampMessage = (msgTimestamp: any) => {
   return msgTimestamp * 1;
@@ -674,13 +652,6 @@ const verifyContact = async (
   companyId: number
 ): Promise<Contact> => {
   let profilePicUrl: string = "";
-  // try {
-  //   profilePicUrl = await wbot.profilePictureUrl(msgContact.id, "image");
-  // } catch (e) {
-  //   Sentry.captureException(e);
-  //   profilePicUrl = `${process.env.FRONTEND_URL}/nopicture.png`;
-  // }
-
   const contactData = {
     name: msgContact.name || msgContact.id.replace(/\D/g, ""),
     number: msgContact.id.replace(/\D/g, ""),
@@ -696,9 +667,7 @@ const verifyContact = async (
     contactData.number = msgContact.id.replace("@g.us", "");
   }
 
-  const contact = await CreateOrUpdateContactService(contactData);
-
-  return contact;
+  return await CreateOrUpdateContactService(contactData);
 };
 
 const verifyQuotedMessage = async (
@@ -772,18 +741,6 @@ export const verifyMediaMessage = async (
     if (!media) {
       throw new Error("ERR_WAPP_DOWNLOAD_MEDIA");
     }
-
-    // if (!media.filename || media.mimetype === "audio/mp4") {
-    //   const ext = media.mimetype === "audio/mp4" ? "m4a" : media.mimetype.split("/")[1].split(";")[0];
-    //   media.filename = `${new Date().getTime()}.${ext}`;
-    // } else {
-    //   // ext = tudo depois do ultimo .
-    //   const ext = media.filename.split(".").pop();
-    //   // name = tudo antes do ultimo .
-    //   const name = media.filename.split(".").slice(0, -1).join(".").replace(/\s/g, '_').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-    //   media.filename = `${name.trim()}_${new Date().getTime()}.${ext}`;
-    // }
     if (!media.filename) {
       const ext = media.mimetype.split("/")[1].split(";")[0];
       media.filename = `${new Date().getTime()}.${ext}`;
@@ -811,7 +768,6 @@ export const verifyMediaMessage = async (
         `company${companyId}`
       );
 
-      // const folder = `public/company${companyId}`; // Correção adicionada por Altemir 16-08-2023
       if (!fs.existsSync(folder)) {
         fs.mkdirSync(folder, { recursive: true }); // Correção adicionada por Altemir 16-08-2023
         fs.chmodSync(folder, 0o777);
@@ -1193,16 +1149,6 @@ async function sendDelayedMessages(
   const whatsapp = await ShowWhatsAppService(wbot.id!, companyId);
   const farewellMessage = whatsapp.farewellMessage.replace(/[_*]/g, "");
 
-  // if (react) {
-  //   const test =
-  //     /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g.test(
-  //       react
-  //     );
-  //   if (test) {
-  //     msg.react(react);
-  //     await delay(1000);
-  //   }
-  // }
   const sentMessage = await wbot.sendMessage(`${contact.number}@c.us`, {
     text: `\u200e *${queueIntegration?.name}:* ` + message
   });
@@ -1215,35 +1161,6 @@ async function sendDelayedMessages(
     wbot.sendPresenceUpdate("recording", contact.remoteJid);
     await delay(500);
 
-    // if (audio && message === lastMessage) {
-    //   const newMedia = new MessageMedia("audio/ogg", audio);
-
-    //   const sentMessage = await wbot.sendMessage(
-    //     `${contact.number}@c.us`,
-    //     newMedia,
-    //     {
-    //       sendAudioAsVoice: true
-    //     }
-    //   );
-
-    //   await verifyMessage(sentMessage, ticket, contact);
-    // }
-
-    // if (sendImage && message === lastMessage) {
-    //   const newMedia = await MessageMedia.fromUrl(sendImage, {
-    //     unsafeMime: true
-    //   });
-    //   const sentMessage = await wbot.sendMessage(
-    //     `${contact.number}@c.us`,
-    //     newMedia,
-    //     {
-    //       sendAudioAsVoice: true
-    //     }
-    //   );
-
-    //   await verifyMessage(sentMessage, ticket, contact);
-    //   await ticket.update({ lastMessage: "📷 Foto" });
-    // }
 
     if (farewellMessage && message.includes(farewellMessage)) {
       await delay(1000);

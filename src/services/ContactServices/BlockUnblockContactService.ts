@@ -1,8 +1,8 @@
 import AppError from "../../errors/AppError";
-import GetDefaultWhatsApp from "../../helpers/GetDefaultWhatsApp";
-import { getWbot } from "../../libs/wbot";
 import Contact from "../../models/Contact";
-import FindCompaniesWhatsappService from "../CompanyService/FindCompaniesWhatsappService";
+import { sessionManager } from "../../libs/wbot/SessionManager";
+import GetDefaultWhatsApp from "../../helpers/GetDefaultWhatsApp";
+import logger from "../../utils/logger";
 
 interface Request {
     contactId: string;
@@ -47,47 +47,27 @@ const BlockUnblockContactService = async ({
         throw new AppError("ERR_NO_CONTACT_FOUND", 404);
     }
 
-    // console.log('active', active)
-    // console.log('companyId', companyId)
-    // console.log('contact.number', contact.number)
+    const blockStatus       = active ? "unblock" : "block";
+    const blockAction       = active ? "desbloquear" : "bloquear";
+    const blockUpdateState  = active;
+    const errorMessage = active ? "ERR_CANNOT_UNBLOCK_CONTACT" : "ERR_CANNOT_BLOCK_CONTACT";
 
-    if (active) {
-        try {
-            //const whatsappCompany = await GetDefaultWhatsApp(Number(companyId))
+    try {
+        const whatsappCompany = await GetDefaultWhatsApp(Number(companyId))
 
-            const whatsappCompany = null;
+        const wbot = sessionManager.getSession(whatsappCompany.id).getSession();
 
-            const wbot = getWbot(whatsappCompany.id);
+        const jid = createJid(contact.number);
 
-            const jid = createJid(contact.number);
+        await wbot.updateBlockStatus(jid, blockStatus);
 
-            await wbot.updateBlockStatus(jid, "unblock");
+        await contact.update({ active: blockUpdateState });
 
-            await contact.update({ active: true });
-
-        } catch (error) {
-            console.log('Não consegui desbloquear o contato')
-        }
+    } catch (error) {
+        logger.error(`Error al ${blockAction} el contacto: ${error}`);
+        throw new AppError(errorMessage, 500);
     }
 
-    if (!active) {
-         try {
-            //const whatsappCompany = await GetDefaultWhatsApp(Number(companyId))
-
-            const whatsappCompany = null;
-
-            const wbot = getWbot(whatsappCompany.id);
-
-            const jid = createJid(contact.number);
-
-            await wbot.updateBlockStatus(jid, "block");
-
-            await contact.update({ active: false });
-
-        } catch (error) {
-            console.log('Não consegui bloquear o contato')
-        }
-    }
 
     return contact;
 };

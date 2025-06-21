@@ -1,11 +1,9 @@
-import { delay, WAMessage, AnyMessageContent } from "@whiskeysockets/baileys";
+import { delay, WAMessage } from "@whiskeysockets/baileys";
 import AppError from "../../errors/AppError";
-import GetTicketWbot from "../../helpers/GetTicketWbot";
-import Ticket from "../../models/Ticket";
 import fs from "fs";
 import path from "path";
 import Contact from "../../models/Contact";
-import { getWbot } from "../../libs/wbot";
+import { sessionManager } from "../../libs/wbot/SessionManager";
 
 interface Request {
   whatsappId: number;
@@ -16,9 +14,10 @@ interface Request {
 }
 
 function makeid(length) {
-  var result = '';
-  var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  var charactersLength = characters.length;
+  let result = "";
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const charactersLength = characters.length;
   for (var i = 0; i < length; i++) {
     result += characters.charAt(Math.floor(Math.random() * charactersLength));
   }
@@ -34,7 +33,7 @@ const SendWhatsAppMessageLink = async ({
   caption,
   msdelay
 }: Request): Promise<WAMessage> => {
-  const wbot = await getWbot(whatsappId);
+  const wbot = sessionManager.getSession(whatsappId).getSession();
   const number = `${contact.number}@${contact.isGroup ? "g.us" : "s.whatsapp.net"}`;
 
   const name = caption.replace('/', '-')
@@ -42,17 +41,19 @@ const SendWhatsAppMessageLink = async ({
   try {
 
     await delay(msdelay)
-    const sentMessage = await wbot.sendMessage(
-      `${number}`,
-      {
-        document: url ? { url } : fs.readFileSync(`${publicFolder}/company${contact.companyId}/${name}-${makeid(5)}.pdf`),
-        fileName: name,
-        mimetype: 'application/pdf'
-      }
-    );
-
-    return sentMessage;
+    return await wbot.sendMessage(`${number}`, {
+      document: url
+        ? { url }
+        : fs.readFileSync(
+            `${publicFolder}/company${contact.companyId}/${name}-${makeid(
+              5
+            )}.pdf`
+          ),
+      fileName: name,
+      mimetype: "application/pdf"
+    });
   } catch (err) {
+    console.error("Error sending WhatsApp message link:", err);
     throw new AppError("ERR_SENDING_WAPP_MSG");
   }
 

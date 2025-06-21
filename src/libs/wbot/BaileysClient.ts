@@ -4,7 +4,13 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   WAMessage,
   proto,
-  jidNormalizedUser, fetchLatestBaileysVersion, SignalAuthState, SignalRepository, isJidBroadcast, isJidGroup
+  jidNormalizedUser,
+  fetchLatestBaileysVersion,
+  SignalAuthState,
+  SignalRepository,
+  isJidBroadcast,
+  isJidGroup,
+  AnyMessageContent
 } from "@whiskeysockets/baileys";
 import * as Sentry from "@sentry/node";
 import { Server } from "socket.io";
@@ -94,6 +100,52 @@ export class BaileysClient {
     this.wsocket.ev.on("creds.update", () => onCredsUpdate(this));
     this.wsocket.ev.on("messaging-history.set", ({ messages }) => onHistorySet(messages, this));
 
+    return this.wsocket;
+  }
+  // =================================================================
+  // --> MÉTODOS AÑADIDOS (DELEGACIÓN / FACHADA)
+  // =================================================================
+
+  /**
+   * Envía un mensaje a través de la conexión de Baileys.
+   * @param jid - El JID del destinatario.
+   * @param content - El contenido del mensaje.
+   */
+  public async sendMessage(jid: string, content: AnyMessageContent) {
+    if (!this.wsocket) throw new Error("Wsocket no está conectado.");
+    return this.wsocket.sendMessage(jid, content);
+  }
+
+  /**
+   * Verifica si un JID existe en WhatsApp.
+   * @param jid - El JID a verificar.
+   */
+  public async onWhatsApp(jid: string) {
+    if (!this.wsocket) throw new Error("Wsocket no está conectado.");
+    return this.wsocket.onWhatsApp(jid);
+  }
+
+  /**
+   * Realiza el logout de la sesión en los servidores de WhatsApp.
+   */
+  public async logout() {
+    if (!this.wsocket) return;
+    return this.wsocket.logout();
+  }
+
+  /**
+   * Cierra la conexión WebSocket de Baileys.
+   */
+  public async close() {
+    if (!this.wsocket) return;
+    return this.wsocket.ws.close();
+  }
+
+  /**
+   * Obtiene la sesión actual de WhatsApp.
+   */
+  public getSession(): Session {
+    if (!this.wsocket) throw new Error("Wsocket no está conectado.");
     return this.wsocket;
   }
 

@@ -1,6 +1,6 @@
 import GetDefaultWhatsApp from "../../helpers/GetDefaultWhatsApp";
-import { getWbot } from "../../libs/wbot";
 import Contact from "../../models/Contact";
+import { sessionManager } from "../../libs/wbot/SessionManager";
 
 const GetProfilePicUrl = async (
   number: string,
@@ -9,7 +9,7 @@ const GetProfilePicUrl = async (
 ): Promise<string> => {
   const defaultWhatsapp = await GetDefaultWhatsApp(null, companyId);
 
-  const wbot = getWbot(defaultWhatsapp.id);
+  const wbot = sessionManager.getSession(defaultWhatsapp.id).getSession();
 
   let profilePicUrl: string;
   try {

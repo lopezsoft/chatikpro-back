@@ -1,6 +1,5 @@
 import * as Sentry from "@sentry/node";
 import GetDefaultWhatsApp from "../../helpers/GetDefaultWhatsApp";
-import { getWbot } from "../../libs/wbot";
 import Contact from "../../models/Contact";
 import logger from "../../utils/logger";
 import ShowBaileysService from "../BaileysServices/ShowBaileysService";
@@ -8,12 +7,13 @@ import CreateContactService from "../ContactServices/CreateContactService";
 import { isString, isArray } from "lodash";
 import path from "path";
 import fs from 'fs';
+import { sessionManager } from "../../libs/wbot/SessionManager";
 
 const ImportContactsService = async (companyId?: number, whatsappId?: number): Promise<void> => {
   const defaultWhatsapp = await GetDefaultWhatsApp(whatsappId, companyId);
-  const wbot = getWbot(defaultWhatsapp.id);
+  const wbot = sessionManager.getSession(defaultWhatsapp.id).getSession();
 
-  let phoneContacts;
+  let phoneContacts: string;
 
   try {
     const contactsString = await ShowBaileysService(wbot.id);
@@ -26,7 +26,6 @@ const ImportContactsService = async (companyId?: number, whatsappId?: number): P
         logger.error(`Failed to write contacts to file: ${err}`);
         throw err;
       }
-      // console.log('O arquivo contatos_antes.txt foi criado!');
     });
 
   } catch (err) {
@@ -41,7 +40,6 @@ const ImportContactsService = async (companyId?: number, whatsappId?: number): P
       logger.error(`Failed to write contacts to file: ${err}`);
       throw err;
     }
-    // console.log('O arquivo contatos_depois.txt foi criado!');
   });
 
   const phoneContactsList = isString(phoneContacts)
@@ -49,8 +47,8 @@ const ImportContactsService = async (companyId?: number, whatsappId?: number): P
     : phoneContacts;
 
   if (isArray(phoneContactsList)) {
-    phoneContactsList.forEach(async ({ id, name, notify }) => {
-      if (id === "status@broadcast" || id.includes("g.us")) return;
+    for (const { id, name, notify } of phoneContactsList) {
+      if (id === "status@broadcast" || id.includes("g.us")) continue;
       const number = id.replace(/\D/g, "");
 
       const existingContact = await Contact.findOne({
@@ -58,11 +56,9 @@ const ImportContactsService = async (companyId?: number, whatsappId?: number): P
       });
 
       if (existingContact) {
-        // Atualiza o nome do contato existente
         existingContact.name = name || notify;
         await existingContact.save();
       } else {
-        // Criar um novo contato
         try {
           await CreateContactService({
             number,
@@ -76,7 +72,7 @@ const ImportContactsService = async (companyId?: number, whatsappId?: number): P
           );
         }
       }
-    });
+    }
   }
 };
 

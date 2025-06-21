@@ -1,26 +1,16 @@
-import AppError from "../../errors/AppError";
-import { WebhookModel } from "../../models/Webhook";
 import { sendMessageFlow } from "../../controllers/MessageController";
 import { IConnections, INodes } from "./DispatchWebHookService";
-import { Request, Response } from "express";
+import { Request } from "express";
 import { ParamsDictionary } from "express-serve-static-core";
 import { ParsedQs } from "qs";
-import CreateContactService from "../ContactServices/CreateContactService";
 import Contact from "../../models/Contact";
-import CreateTicketService from "../TicketServices/CreateTicketService";
-import CreateTicketServiceWebhook from "../TicketServices/CreateTicketServiceWebhook";
 import { SendMessage } from "../../helpers/SendMessage";
 import GetDefaultWhatsApp from "../../helpers/GetDefaultWhatsApp";
 import Ticket from "../../models/Ticket";
-import fs from "fs";
-import GetWhatsappWbot from "../../helpers/GetWhatsappWbot";
-import path from "path";
-import SendWhatsAppMedia from "../WbotServices/SendWhatsAppMedia";
 import SendWhatsAppMediaFlow, {
   typeSimulation
 } from "../WbotServices/SendWhatsAppMediaFlow";
 import { randomizarCaminho } from "../../utils/randomizador";
-import { SendMessageFlow } from "../../helpers/SendMessageFlow";
 import formatBody from "../../helpers/Mustache";
 import SetTicketMessagesAsRead from "../../helpers/SetTicketMessagesAsRead";
 import SendWhatsAppMessage from "../WbotServices/SendWhatsAppMessage";
@@ -33,17 +23,15 @@ import ShowQueueService from "../QueueService/ShowQueueService";
 import { getIO } from "../../libs/socket";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import FindOrCreateATicketTrakingService from "../TicketServices/FindOrCreateATicketTrakingService";
-import ShowTicketUUIDService from "../TicketServices/ShowTicketFromUUIDService";
 import logger from "../../utils/logger";
 import CreateLogTicketService from "../TicketServices/CreateLogTicketService";
 import CompaniesSettings from "../../models/CompaniesSettings";
-import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 import { delay } from "bluebird";
 import typebotListener from "../TypebotServices/typebotListener";
-import { getWbot } from "../../libs/wbot";
 import { proto } from "@whiskeysockets/baileys";
 import { handleOpenAi } from "../IntegrationsServices/OpenAiService";
 import { IOpenAi } from "../../@types/openai";
+import { sessionManager } from "../../libs/wbot/SessionManager";
 
 interface IAddContact {
   companyId: number;
@@ -235,18 +223,10 @@ export const ActionsWebhookService = async (
           body: msg.body
         });
 
-
-        //TESTE BOTÃO
-        //await SendMessageFlow(whatsapp, {
-        //  number: numberClient,
-        //  body: msg.body
-        //} )
         await intervalWhats("1");
       }
-      console.log("273");
       if (nodeSelected.type === "typebot") {
-        console.log("275");
-        const wbot = getWbot(whatsapp.id);
+        const wbot = sessionManager.getSession(whatsapp.id).getSession();
         await typebotListener({
           wbot: wbot,
           msg,
@@ -286,7 +266,7 @@ export const ActionsWebhookService = async (
           where: { number: numberClient, companyId }
         });
 
-        const wbot = getWbot(whatsapp.id);
+        const wbot = sessionManager.getSession(whatsapp.id).getSession();
 
         const ticketTraking = await FindOrCreateATicketTrakingService({
           ticketId: ticket.id,
@@ -310,7 +290,7 @@ export const ActionsWebhookService = async (
         const webhook = ticket?.dataWebhook;
         const variables = ticket?.dataWebhook?.variables;
 
-        if (!variables || variables === undefined || variables === null) {
+        if (!variables) {
           const { message } = nodeSelected.data.typebotIntegration;
           const ticketDetails = await ShowTicketService(ticket.id, companyId);
 

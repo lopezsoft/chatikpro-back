@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { getIO } from "../libs/socket";
 import cacheLayer from "../libs/cache";
-import { removeWbot, restartWbot } from "../libs/wbot";
 import Whatsapp from "../models/Whatsapp";
 import AppError from "../errors/AppError";
 import DeleteBaileysService from "../services/BaileysServices/DeleteBaileysService";
@@ -21,6 +20,8 @@ import UpdateWhatsAppServiceAdmin from "../services/WhatsappService/UpdateWhatsA
 import ListAllWhatsAppsService from "../services/WhatsappService/ListAllWhatsAppService";
 import ListFilterWhatsAppsService from "../services/WhatsappService/ListFilterWhatsAppsService";
 import User from "../models/User";
+import { DeleteWhatsAppSession } from "../services/WbotServices/DeleteWhatsAppSession";
+import { RestartSessionsService } from "../services/WbotServices/RestartSessionsService";
 
 interface WhatsappData {
   name: string;
@@ -403,7 +404,7 @@ export const remove = async (
     await DeleteBaileysService(whatsappId);
     await DeleteWhatsAppService(whatsappId);
     await cacheLayer.delFromPattern(`sessions:${whatsappId}:*`);
-    removeWbot(+whatsappId);
+    DeleteWhatsAppSession(+whatsappId);
 
     io.of(String(companyId))
       .emit(`company-${companyId}-whatsapp`, {
@@ -454,13 +455,12 @@ export const restart = async (
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
 
-  await restartWbot(companyId);
+  await RestartSessionsService(companyId);
 
   return res.status(200).json({ message: "Whatsapp restart." });
 };
 
 export const listAll = async (req: Request, res: Response): Promise<Response> => {
-  const { companyId } = req.user;
   const { session } = req.query as QueryParams;
   const whatsapps = await ListAllWhatsAppsService({ session });
   return res.status(200).json(whatsapps);
@@ -513,7 +513,7 @@ export const removeAdmin = async (
     await DeleteBaileysService(whatsappId);
     await DeleteWhatsAppService(whatsappId);
     await cacheLayer.delFromPattern(`sessions:${whatsappId}:*`);
-    removeWbot(+whatsappId);
+    DeleteWhatsAppSession(+whatsappId);
 
     io.of(String(companyId))
       .emit(`admin-whatsapp`, {
@@ -554,8 +554,6 @@ export const removeAdmin = async (
 
 export const showAdmin = async (req: Request, res: Response): Promise<Response> => {
   const { whatsappId } = req.params;
-  const { companyId } = req.user;
-  // console.log("SHOWING WHATSAPP ADMIN", whatsappId)
   const whatsapp = await ShowWhatsAppServiceAdmin(whatsappId);
 
 

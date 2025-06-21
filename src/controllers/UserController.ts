@@ -14,13 +14,13 @@ import CreateCompanyService from "../services/CompanyService/CreateCompanyServic
 import { SendMail } from "../helpers/SendMail";
 import { useDate } from "../utils/useDate";
 import ShowCompanyService from "../services/CompanyService/ShowCompanyService";
-import { getWbot } from "../libs/wbot";
 import FindCompaniesWhatsappService from "../services/CompanyService/FindCompaniesWhatsappService";
 import User from "../models/User";
 
 import { head } from "lodash";
 import ToggleChangeWidthService from "../services/UserServices/ToggleChangeWidthService";
 import APIShowEmailUserService from "../services/UserServices/APIShowEmailUserService";
+import { sessionManager } from "../libs/wbot/SessionManager";
 
 
 type IndexQuery = {
@@ -147,7 +147,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
       if (whatsappCompany.whatsapps[0].status === "CONNECTED" && (phone !== undefined || !isNil(phone) || !isEmpty(phone))) {
         const whatsappId = whatsappCompany.whatsapps[0].id
-        const wbot = getWbot(whatsappId);
+        const wbot = sessionManager.getSession(whatsappId);
 
         const body = `Olá ${name}, este é uma mensagem sobre o cadastro da ${companyName}!\n\nSegue os dados da sua empresa:\n\nNome: ${companyName}\nEmail: ${email}\nSenha: ${password}\nData Vencimento Trial: ${dateToClient(date)}`
 

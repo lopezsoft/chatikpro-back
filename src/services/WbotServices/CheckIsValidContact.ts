@@ -1,12 +1,12 @@
 import { WASocket } from "@whiskeysockets/baileys";
 import AppError from "../../errors/AppError";
 import GetDefaultWhatsApp from "../../helpers/GetDefaultWhatsApp";
-import { getWbot } from "../../libs/wbot";
+import { sessionManager } from "../../libs/wbot/SessionManager";
 
 const CheckIsValidContact = async (number: string, companyId: number): Promise<void> => {
   const defaultWhatsapp = await GetDefaultWhatsApp(companyId);
 
-  const wbot = getWbot(defaultWhatsapp.id);
+  const wbot = sessionManager.getSession(defaultWhatsapp.id).getSession();
   try {
     const [result] = await (wbot as WASocket).onWhatsApp(
       `${number}@s.whatsapp.net`

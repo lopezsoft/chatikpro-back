@@ -1,5 +1,6 @@
-import { getWbot } from "../libs/wbot";
 import { handleMessage } from "../services/WbotServices/wbotMessageListener";
+import { sessionManager } from "../libs/wbot/SessionManager";
+import logger from "../utils/logger";
 
 export default {
     key: `${process.env.DB_NAME}-handleMessage`,
@@ -12,19 +13,20 @@ export default {
                 console.log("message, wbot, companyId", message, wbot, companyId)
             }
 
-            const w = getWbot(wbot);
+            const w = sessionManager.getSession(wbot).getSession();
 
             if (!w) {
-                console.log("wbot not found", wbot)
+              logger.error(`No se encontró la sesión para el wbot: ${wbot}`);
+              return;
             }
 
             try {
                 await handleMessage(message, w, companyId);
             } catch (error) {
-                console.log(error)
+                logger.error(`Error al manejar el mensaje: ${error}`);
             }
         } catch (error) {
-            console.log("error", error)
+            logger.error(`Error al manejar el mensaje: ${error}`);
         }
     },
 };

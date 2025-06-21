@@ -1,13 +1,11 @@
 import { delay, WAMessage } from "@whiskeysockets/baileys";
 import * as Sentry from "@sentry/node";
 import AppError from "../../errors/AppError";
-import GetTicketWbot from "../../helpers/GetTicketWbot";
 import Message from "../../models/Message";
-import Ticket from "../../models/Ticket";
 
-import formatBody from "../../helpers/Mustache";
 import Contact from "../../models/Contact";
-import { getWbot } from "../../libs/wbot";
+import { sessionManager } from "../../libs/wbot/SessionManager";
+import logger from "../../utils/logger";
 
 interface Request {
   body: string;
@@ -25,7 +23,7 @@ const SendWhatsAppMessage = async ({
   msdelay
 }: Request): Promise<WAMessage> => {
   let options = {};
-  const wbot = await getWbot(whatsappId);
+  const wbot = sessionManager.getSession(whatsappId).getSession();
   const number = `${contact.number}@${contact.isGroup ? "g.us" : "s.whatsapp.net"}`;
 
   if (quotedMsg) {
@@ -51,7 +49,7 @@ const SendWhatsAppMessage = async ({
 
   try {
     await delay(msdelay)
-    const sentMessage = await wbot.sendMessage(
+    return await wbot.sendMessage(
       number,
       {
         text: body
@@ -60,11 +58,9 @@ const SendWhatsAppMessage = async ({
         ...options
       }
     );
-
-    return sentMessage;
   } catch (err) {
     Sentry.captureException(err);
-    console.log(err);
+    logger.error(`Error al enviar mensaje de WhatsApp: ${err}`);
     throw new AppError("ERR_SENDING_WAPP_MSG");
   }
 };

@@ -29,10 +29,10 @@ export const StartWhatsAppSession = async (
     const client = new BaileysClient(whatsapp, repository, io);
 
     // 4. Conectar el cliente
-    const wsocket = await client.connect();
+    await client.connect();
 
     // 5. Si la conexión es exitosa, añadir la sesión al gestor global
-    sessionManager.addSession(wsocket);
+    sessionManager.addSession(client);
     logger.info(`[SESIÓN: ${whatsapp.name}] Sesión añadida al gestor.`);
 
   } catch (error) {

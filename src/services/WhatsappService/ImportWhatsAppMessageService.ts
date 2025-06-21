@@ -5,40 +5,42 @@ import Whatsapp from "../../models/Whatsapp";
 
 import { getIO } from "../../libs/socket";
 import Ticket from "../../models/Ticket";
-import { Op } from "sequelize";
+import { Identifier, Op } from "sequelize";
 import { add } from "date-fns";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
-import { dataMessages, getWbot } from "../../libs/wbot";
 import { handleMessage } from "../WbotServices/wbotMessageListener";
-import fs from 'fs';
 import moment from "moment";
 import { addLogs } from "../../helpers/addLogs";
+import { sessionManager } from "../../libs/wbot/SessionManager";
+import { dataMessages } from "../../utils/db";
 
-
-export const closeTicketsImported = async (whatsappId) => {
-
+export const closeTicketsImported = async (whatsappId: Identifier) => {
   const tickets = await Ticket.findAll({
     where: {
-      status: 'pending',
+      status: "pending",
       whatsappId,
       imported: { [Op.lt]: +add(new Date(), { hours: +5 }) }
     }
-  })
-
+  });
 
   for (const ticket of tickets) {
     await new Promise(r => setTimeout(r, 330));
-    await UpdateTicketService({ ticketData: { status: "closed" }, ticketId: ticket.id, companyId: ticket.companyId })
+    await UpdateTicketService({
+      ticketData: { status: "closed" },
+      ticketId: ticket.id,
+      companyId: ticket.companyId
+    });
   }
   let whatsApp = await Whatsapp.findByPk(whatsappId);
-  whatsApp.update({ statusImportMessages: null })
+  whatsApp.update({ statusImportMessages: null });
   const io = getIO();
-  io.of(whatsApp.companyId.toString())
-    .emit(`importMessages-${whatsApp.companyId}`, {
-      action: "refresh",
-    });
-
-}
+  io.of(whatsApp.companyId.toString()).emit(
+    `importMessages-${whatsApp.companyId}`,
+    {
+      action: "refresh"
+    }
+  );
+};
 
 
 
@@ -70,7 +72,7 @@ const ImportWhatsAppMessageService = async (whatsappId: number | string) => {
   let whatsApp = await Whatsapp.findByPk(whatsappId);
 
 
-  const wbot = getWbot(whatsApp.id);
+  const wbot = sessionManager.getSession(whatsApp.id).getSession();
 
   try {
 

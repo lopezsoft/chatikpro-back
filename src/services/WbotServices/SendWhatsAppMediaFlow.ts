@@ -9,12 +9,7 @@ import GetTicketWbot from "../../helpers/GetTicketWbot";
 import Ticket from "../../models/Ticket";
 import mime from "mime-types";
 import Contact from "../../models/Contact";
-
-interface Request {
-  media: Express.Multer.File;
-  ticket: Ticket;
-  body?: string;
-}
+import logger from "../../utils/logger";
 
 interface RequestFlow {
   media: string;
@@ -33,7 +28,6 @@ const processAudio = async (audio: string): Promise<string> => {
       `${ffmpegPath.path} -i ${audio} -vn -ab 128k -ar 44100 -f ipod ${outputAudio} -y`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
-        //fs.unlinkSync(audio);
         resolve(outputAudio);
       }
     );
@@ -47,7 +41,6 @@ const processAudioFile = async (audio: string): Promise<string> => {
       `${ffmpegPath.path} -i ${audio} -vn -ar 44100 -ac 2 -b:a 192k ${outputAudio}`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
-        //fs.unlinkSync(audio);
         resolve(outputAudio);
       }
     );
@@ -55,12 +48,12 @@ const processAudioFile = async (audio: string): Promise<string> => {
 };
 
 const nameFileDiscovery = (pathMedia: string) => {
-  const spliting = pathMedia.split('/')
-  const first = spliting[spliting.length - 1]
+  const splitting = pathMedia.split('/')
+  const first = splitting[splitting.length - 1]
   return first.split(".")[0]
 }
 
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const typeSimulation = async (ticket: Ticket, presence: WAPresence) => {
 
@@ -91,7 +84,7 @@ const SendWhatsAppMediaFlow = async ({
     const mimetype = mime.lookup(media)
     const pathMedia = media
 
-    const typeMessage = mimetype.split("/")[0];
+    const typeMessage = mimetype ? mimetype.split("/")[0] : "image";
     const mediaName = nameFileDiscovery(media)
 
     let options: AnyMessageContent;
@@ -104,35 +97,40 @@ const SendWhatsAppMediaFlow = async ({
         // gifPlayback: true
       };
     } else if (typeMessage === "audio") {
-      console.log('record', isRecord)
+      logger.info(`Enviando mensaje de audio: ${mediaName}`);
+      // Si es un mensaje de audio grabado (record) o un archivo de audio
       if (isRecord) {
         const convert = await processAudio(pathMedia);
         options = {
           audio: fs.readFileSync(convert),
-          mimetype: typeMessage ? "audio/mp4" : mimetype,
+          mimetype: typeMessage ? "audio/mp4" : mimetype as string,
           ptt: true
         };
       } else {
+        logger.info(`Enviando mensaje de audio: ${mediaName}`);
+        // Si es un mensaje de audio normal
         const convert = await processAudioFile(pathMedia);
         options = {
           audio: fs.readFileSync(convert),
-          mimetype: typeMessage ? "audio/mp4" : mimetype,
+          mimetype: typeMessage ? "audio/mp4" : mimetype as string,
           ptt: false
         };
       }
     } else if (typeMessage === "document" || typeMessage === "text") {
+      // Si es un mensaje de documento o texto
       options = {
         document: fs.readFileSync(pathMedia),
         caption: body,
         fileName: mediaName,
-        mimetype: mimetype
+        mimetype: mimetype ? mimetype : "application/octet-stream"
       };
     } else if (typeMessage === "application") {
+      // Si es un mensaje de aplicación
       options = {
         document: fs.readFileSync(pathMedia),
         caption: body,
         fileName: mediaName,
-        mimetype: mimetype
+        mimetype: mimetype ? mimetype : "application/octet-stream"
       };
     } else {
       options = {
@@ -159,7 +157,7 @@ const SendWhatsAppMediaFlow = async ({
     return sentMessage;
   } catch (err) {
     Sentry.captureException(err);
-    console.log(err);
+    logger.error(`Error al enviar mensaje de WhatsApp: ${err}`);
     throw new AppError("ERR_SENDING_WAPP_MSG");
   }
 };

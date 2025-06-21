@@ -1,6 +1,6 @@
 import { WAMessage, AnyMessageContent } from "@whiskeysockets/baileys";
 import * as Sentry from "@sentry/node";
-import fs, { unlink, unlinkSync } from "fs";
+import fs, { unlinkSync } from "fs";
 import { exec } from "child_process";
 import path from "path";
 import ffmpegPath from "@ffmpeg-installer/ffmpeg";
@@ -9,9 +9,10 @@ import AppError from "../../errors/AppError";
 import Ticket from "../../models/Ticket";
 import mime from "mime-types";
 import Contact from "../../models/Contact";
-import { getWbot } from "../../libs/wbot";
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import formatBody from "../../helpers/Mustache";
+import { sessionManager } from "../../libs/wbot/SessionManager";
+import logger from "../../utils/logger";
 interface Request {
   media: Express.Multer.File;
   ticket: Ticket;
@@ -20,19 +21,6 @@ interface Request {
   isPrivate?: boolean;
   isForwarded?: boolean;
 }
-const os = require("os");
-
-// let ffmpegPath;
-// if (os.platform() === "win32") {
-//   // Windows
-//   ffmpegPath = "C:\\ffmpeg\\ffmpeg.exe"; // Substitua pelo caminho correto no Windows
-// } else if (os.platform() === "darwin") {
-//   // macOS
-//   ffmpegPath = "/opt/homebrew/bin/ffmpeg"; // Substitua pelo caminho correto no macOS
-// } else {
-//   // Outros sistemas operacionais (Linux, etc.)
-//   ffmpegPath = "/usr/bin/ffmpeg"; // Substitua pelo caminho correto em sistemas Unix-like
-// }
 
 const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
 
@@ -43,21 +31,10 @@ const processAudio = async (audio: string, companyId: string): Promise<string> =
       `${ffmpegPath.path} -i ${audio}  -vn -ar 44100 -ac 2 -b:a 192k ${outputAudio} -y`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
-        // fs.unlinkSync(audio);
         resolve(outputAudio);
       }
     );
   });
-  // return new Promise((resolve, reject) => {
-  //   exec(
-  //     `${ffmpegPath} -i ${audio} -vn -ab 128k -ar 44100 -f ipod ${outputAudio} -y`,
-  //     (error, _stdout, _stderr) => {
-  //       if (error) reject(error);
-  //       // fs.unlinkSync(audio);
-  //       resolve(outputAudio);
-  //     }
-  //   );
-  // });
 };
 
 const processAudioFile = async (audio: string, companyId: string): Promise<string> => {
@@ -81,7 +58,7 @@ export const getMessageOptions = async (
   body: string = " "
 ): Promise<any> => {
   const mimeType = mime.lookup(pathMedia);
-  const typeMessage = mimeType.split("/")[0];
+  const typeMessage = mimeType ? mimeType.split("/")[0] : "image";
 
   try {
     if (!mimeType) {
@@ -149,27 +126,26 @@ const SendWhatsAppMedia = async ({
   isForwarded = false
 }: Request): Promise<WAMessage> => {
   try {
-    const wbot = await getWbot(ticket.whatsappId);
+    const wbot = sessionManager.getSession(ticket.whatsappId);
     const companyId = ticket.companyId.toString()
 
     const pathMedia = media.path;
     const typeMessage = media.mimetype.split("/")[0];
     let options: AnyMessageContent;
-    let bodyTicket = "";
     const bodyMedia = ticket ? formatBody(body, ticket) : body;
 
-    // console.log(media.mimetype)
     if (typeMessage === "video") {
       options = {
         video: fs.readFileSync(pathMedia),
         caption: bodyMedia,
-        fileName: media.originalname.replace('/', '-'),
-        contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded },
+        fileName: media.originalname.replace("/", "-"),
+        contextInfo: {
+          forwardingScore: isForwarded ? 2 : 0,
+          isForwarded: isForwarded
+        }
       };
-      bodyTicket = "🎥 Arquivo de vídeo"
     } else if (typeMessage === "audio") {
-
-      const typeAudio = true; //media.originalname.includes("audio-record-site");
+      const typeAudio = true;
       if (typeAudio) {
         const convert = await processAudio(media.path, companyId);
         options = {
@@ -177,7 +153,10 @@ const SendWhatsAppMedia = async ({
           mimetype: "audio/mpeg",
           ptt: true,
           caption: bodyMedia,
-          contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded },
+          contextInfo: {
+            forwardingScore: isForwarded ? 2 : 0,
+            isForwarded: isForwarded
+          }
         };
         unlinkSync(convert);
       } else {
@@ -186,47 +165,57 @@ const SendWhatsAppMedia = async ({
           audio: fs.readFileSync(convert),
           mimetype: "audio/mpeg",
           ptt: true,
-          contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded },
+          contextInfo: {
+            forwardingScore: isForwarded ? 2 : 0,
+            isForwarded: isForwarded
+          }
         };
         unlinkSync(convert);
       }
-      bodyTicket = "🎵 Arquivo de áudio"
     } else if (typeMessage === "document" || typeMessage === "text") {
       options = {
         document: fs.readFileSync(pathMedia),
         caption: bodyMedia,
-        fileName: media.originalname.replace('/', '-'),
+        fileName: media.originalname.replace("/", "-"),
         mimetype: media.mimetype,
-        contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded },
+        contextInfo: {
+          forwardingScore: isForwarded ? 2 : 0,
+          isForwarded: isForwarded
+        }
       };
-      bodyTicket = "📂 Documento"
     } else if (typeMessage === "application") {
       options = {
         document: fs.readFileSync(pathMedia),
         caption: bodyMedia,
-        fileName: media.originalname.replace('/', '-'),
+        fileName: media.originalname.replace("/", "-"),
         mimetype: media.mimetype,
-        contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded },
+        contextInfo: {
+          forwardingScore: isForwarded ? 2 : 0,
+          isForwarded: isForwarded
+        }
       };
-      bodyTicket = "📎 Outros anexos"
     } else {
       if (media.mimetype.includes("gif")) {
         options = {
           image: fs.readFileSync(pathMedia),
           caption: bodyMedia,
           mimetype: "image/gif",
-          contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded },
+          contextInfo: {
+            forwardingScore: isForwarded ? 2 : 0,
+            isForwarded: isForwarded
+          },
           gifPlayback: true
-
         };
       } else {
         options = {
           image: fs.readFileSync(pathMedia),
           caption: bodyMedia,
-          contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded },
+          contextInfo: {
+            forwardingScore: isForwarded ? 2 : 0,
+            isForwarded: isForwarded
+          }
         };
       }
-      bodyTicket = "📎 Outros anexos"
     }
 
     if (isPrivate === true) {
@@ -275,7 +264,7 @@ const SendWhatsAppMedia = async ({
 
     return sentMessage;
   } catch (err) {
-    console.log(`ERRO AO ENVIAR MIDIA ${ticket.id} media ${media.originalname}`)
+    logger.error(`[SendWhatsAppMedia] Error sending media: ${err}`);
     Sentry.captureException(err);
     console.log(err);
     throw new AppError("ERR_SENDING_WAPP_MSG");
