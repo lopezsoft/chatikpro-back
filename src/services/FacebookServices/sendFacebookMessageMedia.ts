@@ -2,7 +2,7 @@ import fs from "fs";
 import AppError from "../../errors/AppError";
 import Ticket from "../../models/Ticket";
 import { sendAttachmentFromUrl } from "./graphAPI";
-// import { verifyMessage } from "./facebookMessageListener";
+// import { CreateTextMessage } from "./facebookMessageListener";
 
 interface Request {
   ticket: Ticket;

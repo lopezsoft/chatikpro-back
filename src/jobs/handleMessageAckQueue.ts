@@ -1,4 +1,5 @@
-import { handleMsgAck } from "../services/WbotServices/wbotMessageListener";
+import { UpdateMessageAckService } from "../services/MessageServices/UpdateMessageAckService";
+import logger from "../utils/logger";
 
 export default {
   key: `${process.env.DB_NAME}-handleMessageAck`,
@@ -8,9 +9,9 @@ export default {
   async handle({ data }) {
     try {
       const { msg, chat } = data;
-      await handleMsgAck(msg, chat);
+      await UpdateMessageAckService(msg, chat);
     } catch (error) {
-      console.log("error", error)
+      logger.error(`Error en handleMessageAckQueue: ${error}`);
     }
   },
 };

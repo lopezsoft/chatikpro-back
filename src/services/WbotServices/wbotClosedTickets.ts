@@ -5,14 +5,12 @@ import { getIO } from "../../libs/socket"
 import formatBody from "../../helpers/Mustache";
 import SendWhatsAppMessage from "./SendWhatsAppMessage";
 import moment from "moment";
-import ShowTicketService from "../TicketServices/ShowTicketService";
-import { verifyMessage } from "./wbotMessageListener";
 import TicketTraking from "../../models/TicketTraking";
 import CreateLogTicketService from "../TicketServices/CreateLogTicketService";
-import Company from "../../models/Company";
 import logger from "../../utils/logger";
 import { isNil } from "lodash";
 import { sub } from "date-fns";
+import { CreateTextMessage } from "../MessageServices/CreateMessageServiceFromWhatsapp";
 
 const closeTicket = async (ticket: any, body: string) => {
   await ticket.update({
@@ -30,9 +28,6 @@ const closeTicket = async (ticket: any, body: string) => {
 };
 
 const handleOpenTickets = async (companyId: number, whatsapp: Whatsapp) => {
-  const currentTime = new Date();
-  const brazilTimeZoneOffset = -3 * 60; // Fuso horário do Brasil é UTC-3
-  const currentTimeBrazil = new Date(currentTime.getTime() + brazilTimeZoneOffset * 60000); // Adiciona o offset ao tempo atual
 
   let timeInactiveMessage = Number(whatsapp.timeInactiveMessage || 0);
   let expiresTime = Number(whatsapp.expiresTicket || 0);
@@ -63,7 +58,7 @@ const handleOpenTickets = async (companyId: number, whatsapp: Whatsapp) => {
       }
 
       const ticketsForInactiveMessage = await Ticket.findAll({
-        where:  whereCondition1 
+        where:  whereCondition1
       });
 
       if (ticketsForInactiveMessage && ticketsForInactiveMessage.length > 0) {
@@ -73,7 +68,7 @@ const handleOpenTickets = async (companyId: number, whatsapp: Whatsapp) => {
           if (!ticket.sendInactiveMessage) {
             const bodyMessageInactive = formatBody(`\u200e ${whatsapp.inactiveMessage}`, ticket);
             const sentMessage = await SendWhatsAppMessage({ body: bodyMessageInactive, ticket: ticket });
-            await verifyMessage(sentMessage, ticket, ticket.contact);
+            await CreateTextMessage(sentMessage, ticket, ticket.contact);
             await ticket.update({ sendInactiveMessage: true, fromMe: true });
           }
         }));
@@ -129,7 +124,7 @@ const handleOpenTickets = async (companyId: number, whatsapp: Whatsapp) => {
         if (!isNil(whatsapp.expiresInactiveMessage) && whatsapp.expiresInactiveMessage !== "") {
           bodyExpiresMessageInactive = formatBody(`\u200e${whatsapp.expiresInactiveMessage}`, ticket);
           const sentMessage = await SendWhatsAppMessage({ body: bodyExpiresMessageInactive, ticket: ticket });
-          await verifyMessage(sentMessage, ticket, ticket.contact);
+          await CreateTextMessage(sentMessage, ticket, ticket.contact);
         }
 
         // Como o campo sendInactiveMessage foi atualizado, podemos garantir que a mensagem foi enviada
@@ -182,7 +177,7 @@ const handleNPSTickets = async (companyId: number, whatsapp: any) => {
       if (!isNil(whatsapp.complationMessage) && whatsapp.complationMessage !== "") {
         bodyComplationMessage = formatBody(`\u200e${whatsapp.complationMessage}`, ticket);
         const sentMessage = await SendWhatsAppMessage({ body: bodyComplationMessage, ticket: ticket });
-        await verifyMessage(sentMessage, ticket, ticket.contact);
+        await CreateTextMessage(sentMessage, ticket, ticket.contact);
       }
 
       await closeTicket(ticket, bodyComplationMessage);

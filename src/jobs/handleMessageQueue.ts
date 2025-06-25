@@ -1,6 +1,6 @@
-import { handleMessage } from "../services/WbotServices/wbotMessageListener";
 import { sessionManager } from "../libs/wbot/SessionManager";
 import logger from "../utils/logger";
+import MessageFlow from "../services/MessageHandling/MessageFlow";
 
 export default {
     key: `${process.env.DB_NAME}-handleMessage`,
@@ -10,9 +10,10 @@ export default {
             const { message, wbot, companyId } = data;
 
             if (message === undefined || wbot === undefined || companyId === undefined) {
-                console.log("message, wbot, companyId", message, wbot, companyId)
+                logger.error("Datos incompletos para manejar el mensaje. Asegúrate de que message, " +
+                  "wbot y companyId estén definidos.", data);
+                return;
             }
-
             const w = sessionManager.getSession(wbot).getSession();
 
             if (!w) {
@@ -21,7 +22,7 @@ export default {
             }
 
             try {
-                await handleMessage(message, w, companyId);
+                await MessageFlow.execute(message, w, companyId);
             } catch (error) {
                 logger.error(`Error al manejar el mensaje: ${error}`);
             }

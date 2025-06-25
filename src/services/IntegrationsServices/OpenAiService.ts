@@ -1,55 +1,24 @@
-import { MessageUpsertType, proto, WASocket } from "@whiskeysockets/baileys";
+import { proto } from "@whiskeysockets/baileys";
 import {
   convertTextToSpeechAndSaveToFile,
-  getBodyMessage,
-  keepOnlySpecifiedChars,
-  transferQueue,
-  verifyMediaMessage,
-  verifyMessage
-} from "../WbotServices/wbotMessageListener";
+} from "../WbotServices/WbotMessageServices";
 
 import fs from "fs";
-import path, { join } from "path";
 
 import OpenAI from "openai";
 import Ticket from "../../models/Ticket";
 import Contact from "../../models/Contact";
 import Message from "../../models/Message";
 import TicketTraking from "../../models/TicketTraking";
-import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
-import Whatsapp from "../../models/Whatsapp";
+import { IOpenAi, ISessionOpenAi } from "../../contracts/WBot";
+import { Session } from "../../utils/types";
+import path from "path";
+import { getBodyMessage } from "../../handlers/MessageClassifier";
+import { TransferTicketQueueService } from "../TicketServices/TransferTicketQueueService";
+import { keepOnlySpecifiedChars } from "../../helpers/utils";
+import { CreateMediaMessage, CreateTextMessage } from "../MessageServices/CreateMessageServiceFromWhatsapp";
 
-type Session = WASocket & {
-  id?: number;
-};
-
-interface ImessageUpsert {
-  messages: proto.IWebMessageInfo[];
-  type: MessageUpsertType;
-}
-
-interface IMe {
-  name: string;
-  id: string;
-}
-
-interface SessionOpenAi extends OpenAI {
-  id?: number;
-}
-const sessionsOpenAi: SessionOpenAi[] = [];
-
-interface IOpenAi {
-  name: string;
-  prompt: string;
-  voice: string;
-  voiceKey: string;
-  voiceRegion: string;
-  maxTokens: number;
-  temperature: number;
-  apiKey: string;
-  queueId: number;
-  maxMessages: number;
-}
+const sessionsOpenAi: ISessionOpenAi[] = [];
 
 const deleteFileSync = (path: string): void => {
   try {
@@ -74,14 +43,12 @@ export const handleOpenAi = async (
   mediaSent: Message | undefined,
   ticketTraking: TicketTraking
 ): Promise<void> => {
-  // REGRA PARA DESABILITAR O BOT PARA ALGUM CONTATO
   if (contact.disableBot) {
     return;
   }
 
   const bodyMessage = getBodyMessage(msg);
   if (!bodyMessage) return;
-  // console.log("GETTING WHATSAPP HANDLE OPENAI", ticket.whatsappId, ticket.id)
 
   if (!openAiSettings) return;
 
@@ -100,9 +67,6 @@ export const handleOpenAi = async (
   const openAiIndex = sessionsOpenAi.findIndex(s => s.id === ticket.id);
 
   if (openAiIndex === -1) {
-    // const configuration = new Configuration({
-    //   apiKey: prompt.apiKey
-    // });
     openai = new OpenAI({
       apiKey: openAiSettings.apiKey
     });
@@ -160,7 +124,7 @@ export const handleOpenAi = async (
 
     if (response?.includes("Acción: Transferir al departamento de atención")) {
       console.log(166, "OpenAiService");
-      await transferQueue(openAiSettings.queueId, ticket, contact);
+      await TransferTicketQueueService(openAiSettings.queueId, ticket);
       response = response
         .replace("Acción: Transferir al departamento de atención", "")
         .trim();
@@ -171,7 +135,7 @@ export const handleOpenAi = async (
       const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
         text: `\u200e ${response!}`
       });
-      await verifyMessage(sentMessage!, ticket, contact);
+      await CreateTextMessage(sentMessage!, ticket, contact);
     } else {
       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
       convertTextToSpeechAndSaveToFile(
@@ -188,7 +152,7 @@ export const handleOpenAi = async (
             mimetype: "audio/mpeg",
             ptt: true
           });
-          await verifyMediaMessage(
+          await CreateMediaMessage(
             sendMessage!,
             ticket,
             contact,
@@ -242,7 +206,7 @@ export const handleOpenAi = async (
     let response = chat.choices[0].message?.content;
 
     if (response?.includes("Acción: Transferir al departamento de atención")) {
-      await transferQueue(openAiSettings.queueId, ticket, contact);
+      await TransferTicketQueueService(openAiSettings.queueId, ticket);
       response = response
         .replace("Acción: Transferir al departamento de atención", "")
         .trim();
@@ -251,7 +215,7 @@ export const handleOpenAi = async (
       const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
         text: `\u200e ${response!}`
       });
-      await verifyMessage(sentMessage!, ticket, contact);
+      await CreateTextMessage(sentMessage!, ticket, contact);
     } else {
       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
       convertTextToSpeechAndSaveToFile(
@@ -268,7 +232,7 @@ export const handleOpenAi = async (
             mimetype: "audio/mpeg",
             ptt: true
           });
-          await verifyMediaMessage(
+          await CreateMediaMessage(
             sendMessage!,
             ticket,
             contact,
@@ -287,3 +251,4 @@ export const handleOpenAi = async (
   }
   messagesOpenAi = [];
 };
+

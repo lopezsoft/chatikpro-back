@@ -7,23 +7,7 @@ import Ticket from "../../models/Ticket";
 import User from "../../models/User";
 import Whatsapp from "../../models/Whatsapp";
 
-export interface MessageData {
-  wid: string;
-  ticketId: number;
-  body: string;
-  contactId?: number;
-  fromMe?: boolean;
-  read?: boolean;
-  mediaType?: string;
-  mediaUrl?: string;
-  ack?: number;
-  queueId?: number;
-  channel?: string;
-  ticketTrakingId?: number;
-  isPrivate?: boolean;
-  ticketImported?: any;
-  isForwarded?: boolean;
-}
+import { MessageData } from "../../contracts/WBot";
 interface Request {
   messageData: MessageData;
   companyId: number;
@@ -93,12 +77,7 @@ const CreateMessageService = async ({
   const io = getIO();
 
   if (!messageData?.ticketImported) {
-    // console.log("emitiu socket 96", message.ticketId)
-
     io.of(String(companyId))
-      // .to(message.ticketId.toString())
-      // .to(message.ticket.status)
-      // .to("notification")
       .emit(`company-${companyId}-appMessage`, {
         action: "create",
         message,

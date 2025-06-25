@@ -19,12 +19,12 @@ import moment from "moment";
 import CompaniesSettings from "../models/CompaniesSettings";
 import ShowUserService from "../services/UserServices/ShowUserService";
 import { isNil } from "lodash";
-import { verifyMediaMessage, verifyMessage } from "../services/WbotServices/wbotMessageListener";
 import ShowQueueService from "../services/QueueService/ShowQueueService";
 import path from "path";
 import FindOrCreateATicketTrakingService from "../services/TicketServices/FindOrCreateATicketTrakingService";
 import { Mutex } from "async-mutex";
 import { sessionManager } from "../libs/wbot/SessionManager";
+import { CreateMediaMessage, CreateTextMessage } from "../services/MessageServices/CreateMessageServiceFromWhatsapp";
 
 type WhatsappData = {
   whatsappId: number;
@@ -260,14 +260,14 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
             }
           })
         );
-        await verifyMediaMessage(sentMessage, contactAndTicket, contactAndTicket.contact, null, false, false, wbot.getSession());
+        await CreateMediaMessage(sentMessage, contactAndTicket, contactAndTicket.contact, null, false, false, wbot.getSession());
       } catch (error) {
         throw new AppError("Error sending API media: " + error.message);
       }
     } else {
       sentMessage = await SendWhatsAppMessageAPI({ body: `\u200e ${bodyMessage}`, whatsappId: whatsapp.id, contact: contactAndTicket.contact, quotedMsg, msdelay });
 
-      await verifyMessage(sentMessage, contactAndTicket, contactAndTicket.contact)
+      await CreateTextMessage(sentMessage, contactAndTicket, contactAndTicket.contact)
     }
     // @ts-ignore: Unreachable code error
     if (closeTicket) {

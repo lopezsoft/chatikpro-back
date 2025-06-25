@@ -17,21 +17,15 @@ import createOrUpdateBaileysService from "../BaileysServices/CreateOrUpdateBaile
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import CompaniesSettings from "../../models/CompaniesSettings";
 import path from "path";
-import { verifyMessage } from "./wbotMessageListener";
+import { Session } from "../../utils/types";
+import { CreateTextMessage } from "../MessageServices/CreateMessageServiceFromWhatsapp";
+import { cleanStringForJSON } from "../../helpers/utils";
 
 let i = 0;
 
 setInterval(() => {
   i = 0
 }, 5000);
-
-type Session = WASocket & {
-  id?: number;
-};
-
-interface IContact {
-  contacts: BContact[];
-}
 
 const wbotMonitor = async (
   wbot: Session,
@@ -55,8 +49,6 @@ const wbotMonitor = async (
           const sentMessage = await wbot.sendMessage(node.attrs.from, {
             text:
               `\u200e ${settings.AcceptCallWhatsappMessage}`,
-            // text:
-            // "\u200e *Mensagem Automática:*\n\nAs chamadas de voz e vídeo estão desabilitadas para esse WhatsApp, favor enviar uma mensagem de texto. Obrigado",              
           });
           const number = node.attrs.from.split(":")[0].replace(/\D/g, "");
 
@@ -83,16 +75,15 @@ const wbotMonitor = async (
             }
           });
 
-          //se não existir o ticket não faz nada.
           if (!ticket) return;
 
-          await verifyMessage(sentMessage, ticket, contact);
+          await CreateTextMessage(sentMessage, ticket, contact);
 
           const date = new Date();
           const hours = date.getHours();
           const minutes = date.getMinutes();
 
-          const body = `Chamada de voz/vídeo perdida às ${hours}:${minutes}`;
+          const body = `Llamada de voz/video perdida a las ${hours}:${minutes}`;
           const messageData = {
             wid: content.attrs["call-id"],
             ticketId: ticket.id,
@@ -121,11 +112,6 @@ const wbotMonitor = async (
       }
     });
 
-    function cleanStringForJSON(str) {
-      // Remove caracteres de controle, ", \ e '
-      return str.replace(/[\x00-\x1F"\\']/g, "");
-    }
-
     wbot.ev.on("contacts.upsert", async (contacts: BContact[]) => {
 
       const filteredContacts: any[] = [];
@@ -153,7 +139,7 @@ const wbotMonitor = async (
         }
         const contatcJson = path.join(publicFolder, `company${companyId}`, "contactJson.txt");
         if (fs.existsSync(contatcJson)) {
-          await fs.unlinkSync(contatcJson);
+          fs.unlinkSync(contatcJson);
         }
 
         await fs.promises.writeFile(contatcJson, JSON.stringify(filteredContacts, null, 2));

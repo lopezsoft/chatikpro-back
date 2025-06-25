@@ -1,5 +1,4 @@
-import { writeFileSync } from "fs";
-import fs from "fs";
+import fs, { writeFileSync } from "fs";
 import axios from "axios";
 import moment from "moment";
 import { join } from "path";
@@ -8,37 +7,30 @@ import Ticket from "../../models/Ticket";
 import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
-import { getProfile, profilePsid, sendText } from "./graphAPI";
+import { profilePsid, sendText } from "./graphAPI";
 import Whatsapp from "../../models/Whatsapp";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
-import { debounce } from "../../helpers/Debounce";
 import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 import formatBody from "../../helpers/Mustache";
 import Queue from "../../models/Queue";
 import Chatbot from "../../models/Chatbot";
 import Message from "../../models/Message";
 import { sayChatbot } from "../WbotServices/ChatbotListenerFacebook";
-import ListSettingsService from "../SettingServices/ListSettingsService";
-import { isNil, isNull, head } from "lodash";
+import { head, isNil, isNull } from "lodash";
 import FindOrCreateATicketTrakingService from "../TicketServices/FindOrCreateATicketTrakingService";
-import { handleMessageIntegration, handleRating, verifyRating } from "../WbotServices/wbotMessageListener";
 import CompaniesSettings from "../../models/CompaniesSettings";
 import sendFacebookMessage from "./sendFacebookMessage";
 import { Mutex } from "async-mutex";
 import TicketTag from "../../models/TicketTag";
 import Tag from "../../models/Tag";
 import ShowQueueIntegrationService from "../QueueIntegrationServices/ShowQueueIntegrationService";
-import { ActionsWebhookService } from "../WebhookService/ActionsWebhookService";
 import { FlowBuilderModel } from "../../models/FlowBuilder";
-import { FlowDefaultModel } from "../../models/FlowDefault";
-import { IConnections, INodes } from "../WebhookService/DispatchWebHookService";
 
 import { differenceInMilliseconds } from "date-fns";
 import { ActionsWebhookFacebookService } from "./WebhookFacebookServices/ActionsWebhookFacebookService";
-import { get } from "http";
-import { WebhookModel } from "../../models/Webhook";
-import { is } from "bluebird";
-import ShowTicketService from "../TicketServices/ShowTicketService";
+import { IConnections, INodes } from "../../contracts/WBot";
+import { handleRating, verifyRating } from "../TicketServices/HandleRatingService";
+import logger from "../../utils/logger";
 
 interface IMe {
   name: string;
@@ -100,9 +92,7 @@ const verifyContact = async (msgContact: any, token: any, companyId: any) => {
     whatsappId: token.id
   };
 
-  const contact = await CreateOrUpdateContactService(contactData);
-
-  return contact;
+  return await CreateOrUpdateContactService(contactData);
 };
 
 export const verifyMessageFace = async (
@@ -118,7 +108,7 @@ export const verifyMessageFace = async (
     ticketId: ticket.id,
     contactId: fromMe ? undefined : msg.is_echo ? undefined : contact.id,
     body: msg.text || body,
-    fromMe: fromMe ? fromMe : msg.is_echo ? true : false,
+    fromMe: fromMe ? fromMe : !!msg.is_echo,
     read: fromMe ? fromMe : msg.is_echo,
     quotedMsgId: quotedMsg?.id,
     ack: 3,
@@ -127,10 +117,6 @@ export const verifyMessageFace = async (
   };
 
   await CreateMessageService({ messageData, companyId: ticket.companyId });
-
-  // await ticket.update({
-  //   lastMessage: msg.text
-  // });
 };
 
 export const verifyMessageMedia = async (
@@ -143,7 +129,6 @@ export const verifyMessageMedia = async (
     responseType: "arraybuffer"
   });
 
-  // eslint-disable-next-line no-eval
   const { fileTypeFromBuffer } = await (eval('import("file-type")') as Promise<typeof import("file-type")>);
 
   const type = await fileTypeFromBuffer(data);
@@ -167,7 +152,7 @@ export const verifyMessageMedia = async (
     ticketId: ticket.id,
     contactId: fromMe ? undefined : msg.is_echo ? undefined : contact.id,
     body: msg.text || fileName,
-    fromMe: fromMe ? fromMe : msg.is_echo ? true : false,
+    fromMe: fromMe ? fromMe : !!msg.is_echo,
     mediaType: msg.attachments[0].type,
     mediaUrl: fileName,
     read: fromMe ? fromMe : msg.is_echo,
@@ -178,10 +163,6 @@ export const verifyMessageMedia = async (
   };
 
   await CreateMessageService({ messageData, companyId: ticket.companyId });
-
-  // await ticket.update({
-  //   lastMessage: msg.text
-  // });
 };
 
 export const verifyQuotedMessage = async (msg: any): Promise<Message | null> => {
@@ -251,12 +232,6 @@ const flowBuilderQueue = async (
       mountDataContact
     );
   }
-
-  //const integrations = await ShowQueueIntegrationService(whatsapp.integrationId, companyId);
-  //await handleMessageIntegration(msg, wbot, companyId, integrations, ticket, contact, isFirstMsg)
-
-
-
 }
 
 
@@ -366,121 +341,6 @@ const flowbuilderIntegration = async (
     }
 
   }
-
-
-  /*
-  if (ticketUpdate.flowWebhook) {
-    const webhook = await WebhookModel.findOne({
-      where: {
-        company_id: ticketUpdate.companyId,
-        hash_id: ticketUpdate.hashFlowId
-      }
-    });
-
-    if (webhook && webhook.config["details"]) {
-      const flow = await FlowBuilderModel.findOne({
-        where: {
-          id: webhook.config["details"].idFlow
-        }
-      });
-      const nodes: INodes[] = flow.flow["nodes"];
-      const connections: IConnections[] = flow.flow["connections"];
-
-      // const worker = new Worker("./src/services/WebhookService/WorkerAction.ts");
-
-      // console.log('DISPARO4')
-      // // Enviar as variáveis como parte da mensagem para o Worker
-      // const data = {
-      //   idFlowDb: webhook.config["details"].idFlow,
-      //   companyId: ticketUpdate.companyId,
-      //   nodes: nodes,
-      //   connects: connections,
-      //   nextStage: ticketUpdate.lastFlowId,
-      //   dataWebhook: ticketUpdate.dataWebhook,
-      //   details: webhook.config["details"],
-      //   hashWebhookId: ticketUpdate.hashFlowId,
-      //   pressKey: body,
-      //   idTicket: ticketUpdate.id,
-      //   numberPhrase: ""
-      // };
-      // worker.postMessage(data);
-
-      // worker.on("message", message => {
-      //   console.log(`Mensagem do worker: ${message}`);
-      // });
-
-      await ActionsWebhookFacebookService(
-        getSession,
-        webhook.config["details"].idFlow,
-        ticketUpdate.companyId,
-        nodes,
-        connections,
-        ticketUpdate.lastFlowId,
-        ticketUpdate.dataWebhook,
-        webhook.config["details"],
-        ticketUpdate.hashFlowId,
-        message.text,
-        ticketUpdate.id
-      );
-    } else {
-      const flow = await FlowBuilderModel.findOne({
-        where: {
-          id: ticketUpdate.flowStopped
-        }
-      });
-
-      const nodes: INodes[] = flow.flow["nodes"];
-      const connections: IConnections[] = flow.flow["connections"];
-
-      if (!ticketUpdate.lastFlowId) {
-        return
-      }
-
-      const mountDataContact = {
-        number: contact.number,
-        name: contact.name,
-        email: contact.email
-      };
-
-      // const worker = new Worker("./src/services/WebhookService/WorkerAction.ts");
-
-      // console.log('DISPARO5')
-      // // Enviar as variáveis como parte da mensagem para o Worker
-      // const data = {
-      //   idFlowDb: parseInt(ticketUpdate.flowStopped),
-      //   companyId: ticketUpdate.companyId,
-      //   nodes: nodes,
-      //   connects: connections,
-      //   nextStage: ticketUpdate.lastFlowId,
-      //   dataWebhook: null,
-      //   details: "",
-      //   hashWebhookId: "",
-      //   pressKey: body,
-      //   idTicket: ticketUpdate.id,
-      //   numberPhrase: mountDataContact
-      // };
-      // worker.postMessage(data);
-      // worker.on("message", message => {
-      //   console.log(`Mensagem do worker: ${message}`);
-      // });
-
-      await ActionsWebhookFacebookService(
-        getSession,
-        parseInt(ticketUpdate.flowStopped),
-        ticketUpdate.companyId,
-        nodes,
-        connections,
-        ticketUpdate.lastFlowId,
-        null,
-        "",
-        "",
-        message.text,
-        ticketUpdate.id,
-        mountDataContact
-      );
-    }
-  }
-  */
 }
 
 export const handleMessage = async (
@@ -552,7 +412,7 @@ export const handleMessage = async (
 
       const mutex = new Mutex();
       const ticket = await mutex.runExclusive(async () => {
-        const createTicket = await FindOrCreateTicketService(
+        return await FindOrCreateTicketService(
           contact,
           getSession,
           unreadCount,
@@ -564,16 +424,14 @@ export const handleMessage = async (
           null,
           false,
           settings
-        )
-        return createTicket;
+        );
       });
 
       let bodyRollbackTag = "";
       let bodyNextTag = "";
-      let rollbackTag;
-      let nextTag;
+      let rollbackTag: Tag;
+      let nextTag: Tag;
       let ticketTag = undefined;
-      // console.log(ticket.id)
       if (ticket?.company?.plan?.useKanban) {
         ticketTag = await TicketTag.findOne({
           where: {
@@ -630,7 +488,7 @@ export const handleMessage = async (
 
             if (!isNaN(parseFloat(bodyMessage))) {
 
-              handleRating(parseFloat(bodyMessage), ticket, ticketTraking);
+              await handleRating(ticket, ticketTraking, parseFloat(bodyMessage));
 
               await ticketTraking.update({
                 ratingAt: moment().toDate(),
@@ -642,7 +500,7 @@ export const handleMessage = async (
             } else {
 
               if (ticket.amountUsedBotQueuesNPS < getSession.maxUseBotQueuesNPS) {
-                let bodyErrorRating = `\u200eOpção inválida, tente novamente.\n`;
+                let bodyErrorRating = `\u200eOpción inválida, intente nuevamente.\n`;
                 const sentMessage = await sendText(
                   contact.number,
                   bodyErrorRating,
@@ -651,12 +509,9 @@ export const handleMessage = async (
 
                 await verifyMessageFace(sentMessage, bodyErrorRating, ticket, contact);
 
-
-                // await delay(1000);
-
                 let bodyRatingMessage = `\u200e${getSession.ratingMessage}\n`;
 
-                const msg = await sendText(contact.number, bodyRatingMessage, getSession.facebookUserToken);
+                await sendText(contact.number, bodyRatingMessage, getSession.facebookUserToken);
 
                 await verifyMessageFace(sentMessage, bodyRatingMessage, ticket, contact);
 
@@ -713,8 +568,6 @@ export const handleMessage = async (
                   await ticketTraking.destroy;
 
                   return
-                  //se digitou qualquer opção que não seja 1 ou 2 limpa o lgpdSendMessageAt para 
-                  //enviar de novo o bot respeitando o numero máximo de vezes que o bot é pra ser enviado
                 } else {
                   if (ticket.amountUsedBotQueues < getSession.maxUseBotQueues) {
                     await ticket.update(
@@ -724,8 +577,6 @@ export const handleMessage = async (
                       });
                   }
                 }
-                //se digitou qualquer opção que não número o lgpdSendMessageAt para 
-                //enviar de novo o bot respeitando o numero máximo de vezes que o bot é pra ser enviado
               } else {
                 if (ticket.amountUsedBotQueues < getSession.maxUseBotQueues) {
                   await ticket.update(
@@ -803,8 +654,8 @@ export const handleMessage = async (
           }
         }
       } catch (e) {
+        logger.error("Error in verifyMessageFace", e);
         throw new Error(e);
-        console.log(e);
       }
 
       if (message.attachments) {
@@ -975,20 +826,6 @@ const verifyQueue = async (
         body: body
       })
 
-      // const debouncedSentChatbot = debounce(
-      //   async () => {
-      //     await sendText(
-      //   contact.number,
-      //   formatBody(body, ticket),
-      //   ticket.whatsapp.facebookUserToken
-      // );
-      //   },
-      //   3000,
-      //   ticket.id
-      // );
-      // debouncedSentChatbot();
-
-      // return await verifyMessage(msg, body, ticket, contact);
     }
 
     if (!choosenQueue.chatbots.length) {
@@ -998,19 +835,6 @@ const verifyQueue = async (
         ticket,
         body: body
       })
-      // const debouncedSentChatbot = debounce(
-      //   async () => { await sendText(
-      //   contact.number,
-      //   formatBody(body, ticket),
-      //   ticket.whatsapp.facebookUserToken
-      // );
-
-      //   },
-      //   3000,
-      //   ticket.id
-      // );
-      // debouncedSentChatbot();
-      // return await verifyMessage(msg, body, ticket, contact);
     }
   } else {
     let options = "";
@@ -1024,23 +848,6 @@ const verifyQueue = async (
     const sentMessage = await sendFacebookMessage({
       ticket,
       body: body
-    })
-    // const debouncedSentChatbot = debounce(
-    //   async () => { await 
-    //     sendText(
-    //       contact.number,
-    //       formatBody(body, ticket),
-    //       ticket.whatsapp.facebookUserToken
-    //     );
-    //   },
-    //   3000,
-    //   ticket.id
-    // );
-    // debouncedSentChatbot();
-
-    // return verifyMessage(msg, body, ticket, contact);
-
-
-
+    });
   }
 };

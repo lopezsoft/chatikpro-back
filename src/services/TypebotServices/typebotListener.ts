@@ -1,17 +1,14 @@
 import axios from "axios";
 import Ticket from "../../models/Ticket";
 import QueueIntegrations from "../../models/QueueIntegrations";
-import { WASocket, delay, proto } from "@whiskeysockets/baileys";
-import { getBodyMessage } from "../WbotServices/wbotMessageListener";
+import {  delay, proto } from "@whiskeysockets/baileys";
 import logger from "../../utils/logger";
 import { isNil } from "lodash";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import moment from "moment";
 import formatBody from "../../helpers/Mustache";
-
-type Session = WASocket & {
-    id?: number;
-};
+import { Session } from "../../utils/types";
+import { getBodyMessage } from "../../handlers/MessageClassifier";
 
 interface Request {
     wbot: Session;
@@ -366,7 +363,7 @@ const typebotListener = async ({
                         }
                     }
                 }
-             
+
                 //console.log(386, { messages, input, clientSideActions})
             }
         }

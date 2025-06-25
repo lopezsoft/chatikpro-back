@@ -1,5 +1,4 @@
 import { sendMessageFlow } from "../../controllers/MessageController";
-import { IConnections, INodes } from "./DispatchWebHookService";
 import { Request } from "express";
 import { ParamsDictionary } from "express-serve-static-core";
 import { ParsedQs } from "qs";
@@ -15,10 +14,6 @@ import formatBody from "../../helpers/Mustache";
 import SetTicketMessagesAsRead from "../../helpers/SetTicketMessagesAsRead";
 import SendWhatsAppMessage from "../WbotServices/SendWhatsAppMessage";
 import ShowTicketService from "../TicketServices/ShowTicketService";
-import CreateMessageService, {
-  MessageData
-} from "../MessageServices/CreateMessageService";
-import { randomString } from "../../utils/randomCode";
 import ShowQueueService from "../QueueService/ShowQueueService";
 import { getIO } from "../../libs/socket";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
@@ -32,14 +27,8 @@ import { proto } from "@whiskeysockets/baileys";
 import { handleOpenAi } from "../IntegrationsServices/OpenAiService";
 import { IOpenAi } from "../../@types/openai";
 import { sessionManager } from "../../libs/wbot/SessionManager";
+import { IConnections, INodes } from "../../contracts/WBot";
 
-interface IAddContact {
-  companyId: number;
-  name: string;
-  phoneNumber: string;
-  email?: string;
-  dataMore?: any;
-}
 
 export const ActionsWebhookService = async (
   whatsappId: number,
@@ -619,23 +608,6 @@ export const ActionsWebhookService = async (
           }
 
           const ticketDetails = await ShowTicketService(ticket.id, companyId);
-
-          const messageData: MessageData = {
-            wid: randomString(50),
-            ticketId: ticket.id,
-            body: msg.body,
-            fromMe: true,
-            read: true
-          };
-
-          //await CreateMessageService({ messageData: messageData, companyId });
-
-          //await SendWhatsAppMessage({ body: bodyFor, ticket: ticketDetails, quotedMsg: null })
-
-          // await SendMessage(whatsapp, {
-          //   number: numberClient,
-          //   body: msg.body
-          // });
 
           await typeSimulation(ticket, "composing");
 

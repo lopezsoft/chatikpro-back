@@ -9,10 +9,8 @@ import Ticket from "../models/Ticket";
 import Queue from "../models/Queue";
 import User from "../models/User";
 import Whatsapp from "../models/Whatsapp";
-import { verify } from "jsonwebtoken";
-import authConfig from "../config/auth";
 import path from "path";
-import { isNil, isNull } from "lodash";
+import { isNil } from "lodash";
 import { Mutex } from "async-mutex";
 
 import ListMessagesService from "../services/MessageServices/ListMessagesService";
@@ -31,9 +29,7 @@ import ShowContactService from "../services/ContactServices/ShowContactService";
 import FindOrCreateTicketService from "../services/TicketServices/FindOrCreateTicketService";
 
 import Contact from "../models/Contact";
-import { verifyMessage,  } from "../services/WbotServices/wbotMessageListener";
 import UpdateTicketService from "../services/TicketServices/UpdateTicketService";
-import ListSettingsService from "../services/SettingServices/ListSettingsService";
 import ShowMessageService, { GetWhatsAppFromMessage } from "../services/MessageServices/ShowMessageService";
 import CompaniesSettings from "../models/CompaniesSettings";
 import { verifyMessageFace, verifyMessageMedia } from "../services/FacebookServices/facebookMessageListener";
@@ -41,34 +37,10 @@ import EditWhatsAppMessage from "../services/MessageServices/EditWhatsAppMessage
 import CheckContactNumber from "../services/WbotServices/CheckNumber";
 import TranscribeAudioMessageToText from "../services/MessageServices/TranscribeAudioMessageService";
 import { generateWAMessageFromContent, generateWAMessageContent } from "@whiskeysockets/baileys";
+import { CreateTextMessage } from "../services/MessageServices/CreateMessageServiceFromWhatsapp";
+import logger from "../utils/logger";
+import { IndexQuery, MessageData } from "../utils/types";
 
-type IndexQuery = {
-  pageNumber: string;
-  ticketTrakingId: string;
-  selectedQueues?: string;
-};
-
-interface TokenPayload {
-  id: string;
-  username: string;
-  profile: string;
-  companyId: number;
-  iat: number;
-  exp: number;
-}
-
-
-type MessageData = {
-  body: string;
-  fromMe: boolean;
-  read: boolean;
-  quotedMsg?: Message;
-  number?: string;
-  isPrivate?: string;
-  vCard?: Contact;
-};
-
-// adicionar funções de botões, pix, etc.
 export const sendListMessage = async (req: Request, res: Response): Promise<Response> => {
   const { ticketId } = req.params;
   const { title, text, buttonText, footer, sections } = req.body;
@@ -95,14 +67,14 @@ export const sendListMessage = async (req: Request, res: Response): Promise<Resp
     };
 
     const number = `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`;
-    console.log('Numero do cliente:', number);
+    logger.info("Sending list message to:", number);
 
     const sendMsg = await wbot.sendMessage(number, listMessage);
-    await verifyMessage(sendMsg, ticket, contact);
+    await CreateTextMessage(sendMsg, ticket, contact);
 
     return res.status(200).json({ message: "List message sent successfully", sendMsg });
   } catch (err) {
-    console.error("Error sending list message: ", err);
+    logger.error("Error sending list message: ", err);
     throw new AppError("Error sending list message", 500);
   }
 };
@@ -133,18 +105,18 @@ export const sendCopyMessage = async (req: Request, res: Response): Promise<Resp
         message: {
           interactiveMessage: {
             body: {
-              text: title || 'Botão copiar',  
+              text: title || 'Botão copiar',
             },
             footer: {
-              text: description || 'Botão copiar',  
+              text: description || 'Botão copiar',
             },
             nativeFlowMessage: {
               buttons: [
                 {
                   name: 'cta_copy',
                   buttonParamsJson: JSON.stringify({
-                    display_text: buttonText || 'Botão copiar',  
-                    copy_code: copyText || 'Botão copiar',  
+                    display_text: buttonText || 'Botão copiar',
+                    copy_code: copyText || 'Botão copiar',
                   }),
                 },
               ],
@@ -199,10 +171,10 @@ export const sendCALLMessage = async (req: Request, res: Response): Promise<Resp
         message: {
           interactiveMessage: {
             body: {
-              text: title || 'Botão copiar', 
+              text: title || 'Botão copiar',
             },
             footer: {
-              text: description || 'Botão copiar',  
+              text: description || 'Botão copiar',
             },
             nativeFlowMessage: {
               buttons: [
@@ -262,7 +234,7 @@ export const sendURLMessage = async (req: Request, res: Response): Promise<Respo
     let copyMessage: any;
 
     if (image) {
-      const base64Image = image.split(',')[1]; 
+      const base64Image = image.split(',')[1];
       const imageMessageContent = await generateWAMessageContent(
         {
           image: {
@@ -313,10 +285,10 @@ export const sendURLMessage = async (req: Request, res: Response): Promise<Respo
           message: {
             interactiveMessage: {
               body: {
-                text: title || 'Botão copiar', 
+                text: title || 'Botão copiar',
               },
               footer: {
-                text: description || 'Botão copiar',  
+                text: description || 'Botão copiar',
               },
               nativeFlowMessage: {
                 buttons: [
@@ -405,7 +377,7 @@ export const sendPIXMessage = async (req: Request, res: Response): Promise<Respo
                       {
                         type: "pix_static_code",
                         pix_static_code: {
-                          key: sendKey, 
+                          key: sendKey,
                           merchant_name: sendmerchant_name,
                           key_type: sendkey_type
                         }
@@ -426,7 +398,7 @@ export const sendPIXMessage = async (req: Request, res: Response): Promise<Respo
                         retailer_id: "custom-item",
                         name: title,
                         amount: {
-                          value: sendvalue * 100, 
+                          value: sendvalue * 100,
                           offset: 100,
                         },
                         quantity: 1,
@@ -434,7 +406,7 @@ export const sendPIXMessage = async (req: Request, res: Response): Promise<Respo
                         isQuantitySet: true,
                       }],
                       subtotal: {
-                        value: sendvalue * 100, 
+                        value: sendvalue * 100,
                         offset: 100,
                       },
                       tax: null,
@@ -453,7 +425,7 @@ export const sendPIXMessage = async (req: Request, res: Response): Promise<Respo
     };
 
     const newMsg = generateWAMessageFromContent(number, interactiveMsg, { userJid: botNumber });
-    
+
     // Envio da mensagem
     await wbot.relayMessage(number, newMsg.message!,{ messageId: newMsg.key.id });
     await wbot.upsertMessage(newMsg, 'notify');

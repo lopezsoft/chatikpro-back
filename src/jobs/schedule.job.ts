@@ -4,7 +4,6 @@ import { Job } from "bull";
 import * as Sentry from "@sentry/node";
 import moment from "moment";
 import { Op } from "sequelize";
-import { isNil } from "lodash";
 import path from 'path';
 
 import { sendScheduledMessages } from "../queues/definitions";
@@ -16,9 +15,9 @@ import Whatsapp from "../models/Whatsapp";
 import Ticket from "../models/Ticket";
 import GetDefaultWhatsApp from "../helpers/GetDefaultWhatsApp";
 import { SendMessage } from "../helpers/SendMessage";
-import { verifyMediaMessage, verifyMessage } from "../services/WbotServices/wbotMessageListener";
 import ShowTicketService from "../services/TicketServices/ShowTicketService";
 import formatBody from "../helpers/Mustache";
+import { CreateMediaMessage, CreateTextMessage } from "../services/MessageServices/CreateMessageServiceFromWhatsapp";
 
 export async function handleVerifySchedules(job: Job): Promise<void> {
   try {
@@ -59,7 +58,9 @@ export async function handleSendScheduledMessage(job: Job): Promise<void> {
       ? await Whatsapp.findByPk(schedule.whatsappId)
       : await GetDefaultWhatsApp(null, schedule.companyId);
 
-    if (!whatsapp) throw new Error(`Whatsapp no encontrado para agendamiento ${schedule.id}`);
+    if (!whatsapp) {
+      throw new Error(`Whatsapp no encontrado para  ${schedule.id}`);
+    }
 
     const filePath = schedule.mediaPath ? path.resolve("public", `company${schedule.companyId}`, schedule.mediaPath) : null;
 
@@ -91,9 +92,9 @@ export async function handleSendScheduledMessage(job: Job): Promise<void> {
       }, schedule.contact.isGroup);
 
       if (schedule.mediaPath) {
-        await verifyMediaMessage(sentMessage, ticketToShow, ticketToShow.contact, null, true, false, whatsapp as any);
+        await CreateMediaMessage(sentMessage, ticketToShow, ticketToShow.contact, null, true, false, whatsapp as any);
       } else {
-        await verifyMessage(sentMessage, ticketToShow, ticketToShow.contact, null, true, false);
+        await CreateTextMessage(sentMessage, ticketToShow, ticketToShow.contact, null, true, false);
       }
     } else {
       await SendMessage(whatsapp, {

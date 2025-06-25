@@ -2,15 +2,13 @@
 import { WAMessage } from "@whiskeysockets/baileys";
 import { BaileysClient } from "../libs/wbot/BaileysClient";
 import logger from "../utils/logger";
-import { addLogs } from "../helpers/addLogs";
-import moment from "moment";
-import { getTypeMessage, isValidMsg } from "../services/WbotServices/wbotMessageListener";
-import { dataMessages } from "../utils/db"; // Asumiendo que dataMessages se mueve a un archivo de utilidad
+import { dataMessages } from "../utils/db";
 import ImportWhatsAppMessageService from "../services/WhatsappService/ImportWhatsAppMessageService";
 import { add } from "date-fns";
+import MessageValidator from "../services/MessageHandling/MessageValidator";
 
 export async function onHistorySet(messages: WAMessage[], client: BaileysClient) {
-  const { whatsapp, id: whatsappId, io } = client;
+  const { id: whatsappId, io } = client;
 
   try {
     const wpp = await client.repository.find(whatsappId);
@@ -25,7 +23,7 @@ export async function onHistorySet(messages: WAMessage[], client: BaileysClient)
 
     const filteredDateMessages = messages.filter(msg => {
       const timestampMsg = Math.floor(Number(msg.messageTimestamp) * 1000);
-      const isValid = isValidMsg(msg) && dateOldLimit < timestampMsg && dateRecentLimit > timestampMsg;
+      const isValid = MessageValidator.validate(msg) && dateOldLimit < timestampMsg && dateRecentLimit > timestampMsg;
       if (!isValid) return false;
 
       const isGroup = msg.key?.remoteJid?.endsWith("@g.us");

@@ -8,11 +8,11 @@ import Ticket from "../../models/Ticket";
 import { Identifier, Op } from "sequelize";
 import { add } from "date-fns";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
-import { handleMessage } from "../WbotServices/wbotMessageListener";
 import moment from "moment";
 import { addLogs } from "../../helpers/addLogs";
 import { sessionManager } from "../../libs/wbot/SessionManager";
 import { dataMessages } from "../../utils/db";
+import MessageFlow from "../MessageHandling/MessageFlow";
 
 export const closeTicketsImported = async (whatsappId: Identifier) => {
   const tickets = await Ticket.findAll({
@@ -44,23 +44,26 @@ export const closeTicketsImported = async (whatsappId: Identifier) => {
 
 
 
-function sortByMessageTimestamp(a, b) {
-  return b.messageTimestamp - a.messageTimestamp
+function sortByMessageTimestamp(
+  a: { messageTimestamp: number },
+  b: { messageTimestamp: number }
+) {
+  return b.messageTimestamp - a.messageTimestamp;
 }
 
-function cleaner(array) {
+function cleaner(array: any) {
   const mapa = new Map();
   const resultado = [];
 
   for (const objeto of array) {
-    const valorChave = objeto['key']['id'];
+    const valorChave = objeto["key"]["id"];
     if (!mapa.has(valorChave)) {
       mapa.set(valorChave, true);
       resultado.push(objeto);
     }
   }
 
-  return resultado.sort(sortByMessageTimestamp)
+  return resultado.sort(sortByMessageTimestamp);
 }
 
 
@@ -83,13 +86,13 @@ const ImportWhatsAppMessageService = async (whatsappId: number | string) => {
 
     addLogs({
       fileName: `processImportMessagesWppId${whatsappId}.txt`, forceNewFile: true,
-      text: `Aguardando conexão para iniciar a importação de mensagens:
-    Whatsapp nome: ${whatsApp.name}
-    Whatsapp Id: ${whatsApp.id}
-    Criação do arquivo de logs: ${moment().format("DD/MM/YYYY HH:mm:ss")}
-    Selecionado Data de inicio de importação: ${moment(dateOldLimit).format("DD/MM/YYYY HH:mm:ss")}
-    Selecionado Data final da importação: ${moment(dateRecentLimit).format("DD/MM/YYYY HH:mm:ss")}
-    `
+      text: `Esperando conexión para iniciar la importación de mensajes:
+      Nombre de WhatsApp: ${whatsApp.name}
+      ID de WhatsApp: ${whatsApp.id}
+      Creación del archivo de logs: ${moment().format("DD/MM/YYYY HH:mm:ss")}
+      Fecha de inicio de importación seleccionada: ${moment(dateOldLimit).format("DD/MM/YYYY HH:mm:ss")}
+      Fecha final de importación seleccionada: ${moment(dateRecentLimit).format("DD/MM/YYYY HH:mm:ss")}
+      `
     })
 
 
@@ -103,7 +106,7 @@ const ImportWhatsAppMessageService = async (whatsappId: number | string) => {
           fileName: `processImportMessagesWppId${whatsappId}.txt`, text: `
 Mensagem ${i + 1} de ${qtd}
               `})
-        await handleMessage(msg, wbot, whatsApp.companyId, true);
+        await MessageFlow.execute(msg, wbot, whatsApp.companyId, true);
 
         if (i % 2 === 0) {
           const timestampMsg = Math.floor(msg.messageTimestamp["low"] * 1000)

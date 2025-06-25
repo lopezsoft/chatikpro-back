@@ -4,12 +4,8 @@ import Queue from "../../../models/Queue";
 import Ticket from "../../../models/Ticket";
 import Whatsapp from "../../../models/Whatsapp";
 import ShowTicketService from "../../TicketServices/ShowTicketService";
-import { IConnections, INodes } from "../../WebhookService/DispatchWebHookService"
-import { getAccessToken, sendAttachmentFromUrl, sendText, showTypingIndicator } from "../graphAPI";
+import { sendAttachmentFromUrl, sendText, showTypingIndicator } from "../graphAPI";
 import formatBody from "../../../helpers/Mustache";
-import axios from "axios";
-import fs from "fs";
-import { sendFacebookMessageMedia } from "../sendFacebookMessageMedia";
 import mime from "mime";
 import path from "path";
 import { getIO } from "../../../libs/socket";
@@ -19,8 +15,7 @@ import UpdateTicketService from "../../TicketServices/UpdateTicketService";
 import FindOrCreateATicketTrakingService from "../../TicketServices/FindOrCreateATicketTrakingService";
 import ShowQueueService from "../../QueueService/ShowQueueService";
 import ffmpeg from "fluent-ffmpeg";
-import { fi } from "date-fns/locale";
-import queue from "../../../libs/queue";
+import { IConnections, INodes, NumberPhrase } from "../../../contracts/WBot";
 const os = require("os");
 
 let ffmpegPath;
@@ -35,21 +30,6 @@ if (os.platform() === "win32") {
     ffmpegPath = "/usr/bin/ffmpeg"; // Substitua pelo caminho correto em sistemas Unix-like
 }
 ffmpeg.setFfmpegPath(ffmpegPath);
-
-
-interface IAddContact {
-    companyId: number;
-    name: string;
-    phoneNumber: string;
-    email?: string;
-    dataMore?: any;
-}
-
-interface NumberPhrase {
-    number: string,
-    name: string,
-    email: string
-}
 
 
 export const ActionsWebhookFacebookService = async (
@@ -862,7 +842,7 @@ async function updateQueueId(ticket: Ticket, companyId: number, queueId: number)
     await UpdateTicketService({
         ticketData: {
             status: "pending",
-            queueId: queueId 
+            queueId: queueId
         },
         ticketId: ticket.id,
         companyId
