@@ -4,7 +4,7 @@ import DialogChatBots from "../../models/DialogChatBots";
 const ShowDialogChatBotsServices = async (
   contactId: number | string
 ): Promise<DialogChatBots | void> => {
-  const dialog = await DialogChatBots.findOne({
+  return DialogChatBots.findOne({
     where: {
       contactId
     },
@@ -16,8 +16,6 @@ const ShowDialogChatBotsServices = async (
       }
     ]
   });
-
-  return dialog;
 };
 
 export default ShowDialogChatBotsServices;
